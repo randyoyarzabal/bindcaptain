@@ -50,6 +50,30 @@ bind.list_records yourdomain.com
 bind.git_refresh
 ```
 
+## 🛠️ Management Commands
+
+BindCaptain provides several management commands for DNS operations:
+
+```bash
+# Container Management
+sudo ./bindcaptain.sh build    # Build container image
+sudo ./bindcaptain.sh run      # Start DNS container
+sudo ./bindcaptain.sh stop     # Stop container
+sudo ./bindcaptain.sh restart  # Restart container
+sudo ./bindcaptain.sh logs     # View container logs
+sudo ./bindcaptain.sh status   # Check container status
+
+# DNS Record Management (via bindcaptain_manager.sh)
+bind.create_record <hostname> <domain> <ip>     # Add A record
+bind.create_cname <alias> <domain> <target>     # Add CNAME record  
+bind.create_txt <name> <domain> <text>          # Add TXT record
+bind.delete_record <name> <domain> [type]       # Delete record
+bind.list_records [domain] [type]               # List records
+
+# System Updates
+bind.git_refresh [--force]                      # Update codebase from GitHub
+```
+
 ## ✨ Features
 
 - **🐳 Containerized** - Clean, isolated BIND installation
