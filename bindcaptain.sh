@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default paths (can be overridden by user)
 USER_CONFIG_DIR="${USER_CONFIG_DIR:-$SCRIPT_DIR/config}"
-CONTAINER_DATA_DIR="${CONTAINER_DATA_DIR:-/opt/bindcaptain}"
+# Direct mount from bindcaptain directory - no staging needed
 
 # Colors for output
 RED='\033[0;31m'
@@ -149,55 +149,23 @@ stop_container() {
     fi
 }
 
-# Create host directories
-create_directories() {
-    print_status "info" "Creating container data directories..."
+# Prepare configuration for direct mounting
+prepare_config() {
+    print_status "info" "Preparing configuration for direct mounting..."
     
-    local dirs=(
-        "$CONTAINER_DATA_DIR/config"
-        "$CONTAINER_DATA_DIR/zones"
-        "$CONTAINER_DATA_DIR/data"
-        "$CONTAINER_DATA_DIR/logs"
-        "$CONTAINER_DATA_DIR/scripts"
-        "$CONTAINER_DATA_DIR/backups"
-    )
+    # Ensure proper permissions on source config files
+    sudo chown -R named:named "$USER_CONFIG_DIR"
+    sudo chmod 644 "$USER_CONFIG_DIR/named.conf"
+    sudo chmod 644 "$USER_CONFIG_DIR"/*/*.db 2>/dev/null || true
     
-    for dir in "${dirs[@]}"; do
-        mkdir -p "$dir"
-        chmod 755 "$dir"
-    done
+    # Create necessary directories for container operation
+    mkdir -p "$USER_CONFIG_DIR/data" "$USER_CONFIG_DIR/logs"
+    sudo chown -R named:named "$USER_CONFIG_DIR/data" "$USER_CONFIG_DIR/logs"
     
-    print_status "success" "Container directories created at $CONTAINER_DATA_DIR"
+    print_status "success" "Configuration prepared for direct mounting"
 }
 
-# Copy user configuration to container directories
-copy_user_config() {
-    print_status "info" "Copying user configuration to container directories..."
-    
-    # Copy main configuration (preserve permissions)
-    cp -p "$USER_CONFIG_DIR/named.conf" "$CONTAINER_DATA_DIR/config/"
-    
-    # Copy zone files (preserve permissions)
-    find "$USER_CONFIG_DIR" -name "*.db" -exec cp -p {} "$CONTAINER_DATA_DIR/zones/" \;
-    
-    # Copy scripts if they exist
-    if [ -d "$USER_CONFIG_DIR/scripts" ]; then
-        cp "$USER_CONFIG_DIR/scripts"/* "$CONTAINER_DATA_DIR/scripts/" 2>/dev/null || true
-    fi
-    
-    # Copy management scripts
-    cp "$SCRIPT_DIR/tools/bindcaptain_manager.sh" "$CONTAINER_DATA_DIR/scripts/"
-    cp "$SCRIPT_DIR/tools/bindcaptain_refresh.sh" "$CONTAINER_DATA_DIR/scripts/"
-    
-    # Set proper permissions
-    chown -R root:root "$CONTAINER_DATA_DIR/config" "$CONTAINER_DATA_DIR/scripts"
-    chown -R 25:25 "$CONTAINER_DATA_DIR/zones" "$CONTAINER_DATA_DIR/data" "$CONTAINER_DATA_DIR/logs" "$CONTAINER_DATA_DIR/backups"
-    chmod 640 "$CONTAINER_DATA_DIR/config/named.conf"
-    chmod 644 "$CONTAINER_DATA_DIR/zones"/*.db 2>/dev/null || true
-    chmod +x "$CONTAINER_DATA_DIR/scripts"/*.sh 2>/dev/null || true
-    
-    print_status "success" "User configuration copied and permissions set"
-}
+# No longer needed - mounting directly from source
 
 # Auto-detect bind IP from named.conf
 detect_bind_ip() {
@@ -220,18 +188,17 @@ run_container() {
     
     print_status "info" "Starting BIND DNS container on $bind_ip:53..."
     
-    # Run container with user's configuration mounted
+    # Run container with direct mounting from source config
     podman run -d \
         --name "$CONTAINER_NAME" \
         --hostname "ns1.$(basename $USER_CONFIG_DIR)" \
         -p "${bind_ip}:53:53/tcp" \
         -p "${bind_ip}:53:53/udp" \
-        -v "$CONTAINER_DATA_DIR/config/named.conf:/etc/named.conf:ro,Z" \
-        -v "$CONTAINER_DATA_DIR/zones:/var/named:rw,Z" \
-        -v "$CONTAINER_DATA_DIR/data:/var/named/data:rw,Z" \
-        -v "$CONTAINER_DATA_DIR/logs:/var/log/named:rw,Z" \
-        -v "$CONTAINER_DATA_DIR/scripts:/usr/local/scripts:ro,Z" \
-        -v "$CONTAINER_DATA_DIR/backups:/var/backups/bind:rw,Z" \
+        -v "$USER_CONFIG_DIR/named.conf:/etc/named.conf:ro,Z" \
+        -v "$USER_CONFIG_DIR:/var/named:rw,Z" \
+        -v "$USER_CONFIG_DIR/data:/var/named/data:rw,Z" \
+        -v "$USER_CONFIG_DIR/logs:/var/log/named:rw,Z" \
+        -v "$SCRIPT_DIR/tools:/usr/local/scripts:ro,Z" \
         --env TZ="${TZ:-UTC}" \
         --env BIND_USER=named \
         --env BIND_DEBUG_LEVEL="${BIND_DEBUG_LEVEL:-1}" \
@@ -296,7 +263,7 @@ show_info() {
     echo "  Image: ${IMAGE_NAME}:${IMAGE_TAG}"
     echo "  DNS IP: $bind_ip:53"
     echo "  User Config: $USER_CONFIG_DIR"
-    echo "  Container Data: $CONTAINER_DATA_DIR"
+    echo "  Mount Source: $USER_CONFIG_DIR (direct mount)"
     echo
     
     print_status "info" "Useful Commands:"
@@ -318,7 +285,6 @@ show_help() {
     echo
     echo "Environment Variables:"
     echo "  USER_CONFIG_DIR      - Directory with your BIND configuration (default: ./config)"
-    echo "  CONTAINER_DATA_DIR   - Container data directory (default: /opt/bind-dns)"
     echo "  BIND_DEBUG_LEVEL     - BIND debug level (default: 1)"
     echo "  TZ                   - Timezone (default: UTC)"
     echo
@@ -342,7 +308,7 @@ show_help() {
     echo "  USER_CONFIG_DIR=/path/to/my/dns-config sudo $0 run"
     echo
     echo "  # Use custom data directory"
-    echo "  CONTAINER_DATA_DIR=/opt/my-dns sudo $0 run"
+    echo "  USER_CONFIG_DIR=/opt/my-dns-config sudo $0 run"
     echo
 }
 
@@ -365,8 +331,7 @@ main() {
             validate_user_config
             stop_container
             build_container
-            create_directories
-            copy_user_config
+            prepare_config
             run_container
             check_status
             show_info
