@@ -11,7 +11,7 @@ options {
     memstatistics-file "/var/named/data/named_mem_stats.txt";
     secroots-file   "/var/named/data/named.secroots";
     recursing-file  "/var/named/data/named.recursing";
-    allow-query     { localhost; YOUR_NETWORK/16; };
+    allow-query     { localhost; 192.168.1.0/24; };
     
     /*
      - If you are building an AUTHORITATIVE DNS server, do NOT enable recursion.
