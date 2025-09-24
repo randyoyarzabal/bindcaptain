@@ -421,10 +421,11 @@ bind.create_record() {
     increment_serial "$zone_file"
     
     if validate_zone "$domain"; then
-        reload_bind
-        
-        # Create corresponding PTR record
+        # Create corresponding PTR record before reload
         create_ptr_record "$ip_address" "$hostname" "$domain"
+        
+        # Reload BIND to pick up both forward and reverse zone changes
+        reload_bind
         
         print_status "success" "A record created: $hostname.$domain -> $ip_address"
         log_action "Created A record: $hostname.$domain -> $ip_address"

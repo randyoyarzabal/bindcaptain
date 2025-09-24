@@ -90,9 +90,8 @@ RUN chmod +x /usr/local/bin/container_start.sh
 # Expose DNS ports
 EXPOSE 53/udp 53/tcp 953/tcp
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD dig @127.0.0.1 . || exit 1
+# Note: HEALTHCHECK removed - not supported in OCI format (Podman default)
+# Container health is managed by bindcaptain.sh status/logs commands
 
 # Set working directory
 WORKDIR /var/named
