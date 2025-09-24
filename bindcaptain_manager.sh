@@ -820,6 +820,12 @@ bind.git_refresh() {
         return 1
     fi
     
+    # Fix git ownership issues when running as root
+    if [[ "$EUID" -eq 0 ]]; then
+        print_status "info" "Configuring git safe directory for root access..."
+        git config --global --add safe.directory "$bindcaptain_dir" 2>/dev/null || true
+    fi
+    
     # Backup config if it exists
     if [[ -d "config" ]]; then
         print_status "info" "Backing up local configuration..."
