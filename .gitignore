@@ -15,6 +15,9 @@ dns-config/
 my-config/
 production-config/
 
+# Backup directories created by bind.git_refresh
+config.backup.*/
+
 # =============================================================================
 # CONTAINER DATA & RUNTIME
 # =============================================================================
