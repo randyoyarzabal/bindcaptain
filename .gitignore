@@ -15,8 +15,9 @@ dns-config/
 my-config/
 production-config/
 
-# Backup directories created by bind.git_refresh
+# Backup directories created by bind.git_refresh and bindcaptain_manager
 config.backup.*/
+backups/
 
 # =============================================================================
 # CONTAINER DATA & RUNTIME
@@ -38,6 +39,7 @@ logs/
 # Test results and temporary files
 tests/results/
 tests/test-configs/
+tests/temp/
 *.tmp
 *.bak
 *.backup
