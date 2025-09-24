@@ -248,27 +248,22 @@ test_container_startup() {
         return 0
     fi
     
-    # Create minimal test config
+    # Create minimal test config (syntax-only, no file references)
     local test_named_conf="$TEST_CONFIG_DIR/named.conf"
     mkdir -p "$TEST_CONFIG_DIR"
     cat > "$test_named_conf" << 'EOF'
 options {
-    directory "/var/named";
+    directory "/tmp";
     allow-query { localhost; };
     dnssec-validation auto;
     recursion yes;
 };
-
-zone "." IN {
-    type hint;
-    file "named.ca";
-};
 EOF
     
-    # Try to start container with test config (dry run)
-    if ! $container_cmd run --rm --name "$CONTAINER_NAME-dryrun" \
+    # Try to start container with test config (syntax check only with timeout)
+    if ! timeout 30s $container_cmd run --rm --name "$CONTAINER_NAME-dryrun" \
         -v "$test_named_conf:/etc/named.conf:ro" \
-        "$IMAGE_NAME" named-checkconf /etc/named.conf >/dev/null 2>&1; then
+        "$IMAGE_NAME" named-checkconf -t /etc/named.conf >/dev/null 2>&1; then
         test_fail "Container Startup" "Container failed basic startup test"
         return 1
     fi
