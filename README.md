@@ -6,24 +6,30 @@ Modern, containerized BIND DNS solution with automated management, perfect for h
 
 ## 🚀 Quick Start
 
-### 1. Clone & Setup
+### 1. Clone & Configure
 ```bash
 git clone https://github.com/randyoyarzabal/bindcaptain.git
 cd bindcaptain
-sudo ./setup.sh
-```
 
-### 2. Configure Your Zones
-```bash
-# Copy your DNS zones to config/
+# Add your DNS zones
 mkdir -p config/yourdomain.com
-# Add your zone files to config/yourdomain.com/
+# Copy your zone files to config/yourdomain.com/
+# Copy config-examples/named.conf.template to config/named.conf and customize
 ```
 
-### 3. Launch
+### 2. Launch Container
 ```bash
 sudo ./bindcaptain.sh build
 sudo ./bindcaptain.sh run
+```
+
+### 3. Verify & Manage
+```bash
+# Test DNS resolution
+dig @your-server-ip yourdomain.com
+
+# Manage DNS records
+sudo bash -c "source ./bindcaptain_manager.sh && bind.create_record webserver yourdomain.com 192.168.1.100"
 ```
 
 ## 📝 DNS Management
@@ -78,9 +84,19 @@ BindCaptain/
 
 ## 🛠️ Requirements
 
-- **Rocky Linux 9 / CentOS Stream 9 / AlmaLinux 9** (recommended)
-- **Podman** (auto-installed by setup script)
-- **Git & bind-utils** (auto-installed)
+- **Podman** (container runtime)
+- **Git** (for cloning repository)
+
+### 🔧 First-Time Container Setup (Optional)
+
+If you need to install Podman and container tools:
+
+```bash
+# Rocky Linux 9 / CentOS Stream 9 / AlmaLinux 9
+sudo ./setup.sh  # Installs Podman, git, bind-utils
+```
+
+See [docs/setup-system.md](docs/setup-system.md) for detailed system setup.
 
 ## 🤝 Contributing
 
