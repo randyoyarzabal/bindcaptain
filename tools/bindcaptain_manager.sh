@@ -203,8 +203,16 @@ reload_bind() {
                 log_action "BIND reloaded via container"
                 return 0
             else
-                print_status "error" "Failed to reload BIND via container"
-                return 1
+                print_status "warning" "rndc reload failed, attempting container restart..."
+                if podman restart "$CONTAINER_NAME" >/dev/null 2>&1; then
+                    sleep 3  # Give container time to start
+                    print_status "success" "BIND reloaded via container restart"
+                    log_action "BIND reloaded via container restart"
+                    return 0
+                else
+                    print_status "error" "Failed to reload BIND via container"
+                    return 1
+                fi
             fi
         else
             print_status "error" "Cannot reload BIND - not in container and podman not available"
