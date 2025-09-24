@@ -147,7 +147,7 @@ test_script_syntax() {
         "tools/bindcaptain_manager.sh"
         "tools/bindcaptain_refresh.sh"
         "tools/container_start.sh"
-        "setup.sh"
+        "tools/setup.sh"
     )
     
     for script in "${scripts[@]}"; do
