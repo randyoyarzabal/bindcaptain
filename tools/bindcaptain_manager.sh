@@ -136,7 +136,10 @@ validate_ip() {
 # Backup zone file
 backup_zone() {
     local domain=$1
-    local zone_file="$BIND_DIR/${domain}.db"
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
     
     if [ ! -f "$zone_file" ]; then
         print_status "error" "Zone file for $domain not found"
@@ -213,7 +216,10 @@ reload_bind() {
 # Validate zone file
 validate_zone() {
     local domain=$1
-    local zone_file="$BIND_DIR/${domain}.db"
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
     
     if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
         # Running inside container
@@ -228,12 +234,18 @@ validate_zone() {
     else
         # Running on host - validate via container
         if command -v podman &> /dev/null; then
-            if podman exec "$CONTAINER_NAME" named-checkzone "$domain" "/var/named/$(basename "$zone_file")" >/dev/null 2>&1; then
+            # Try subdirectory structure first, then fallback to direct path
+            local container_zone_file="/var/named/${domain}/${domain}.db"
+            if ! podman exec "$CONTAINER_NAME" test -f "$container_zone_file" 2>/dev/null; then
+                container_zone_file="/var/named/${domain}.db"
+            fi
+            
+            if podman exec "$CONTAINER_NAME" named-checkzone "$domain" "$container_zone_file" >/dev/null 2>&1; then
                 print_status "success" "Zone $domain validation passed (via container)"
                 return 0
             else
                 print_status "error" "Zone $domain validation failed (via container)"
-                podman exec "$CONTAINER_NAME" named-checkzone "$domain" "/var/named/$(basename "$zone_file")"
+                podman exec "$CONTAINER_NAME" named-checkzone "$domain" "$container_zone_file"
                 return 1
             fi
         else
