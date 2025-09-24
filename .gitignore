@@ -1,0 +1,124 @@
+# ⚓ BindCaptain .gitignore
+# Protects your personal DNS configurations from being committed to Git
+
+# =============================================================================
+# USER CONFIGURATIONS (NEVER COMMIT THESE)
+# =============================================================================
+
+# Your personal DNS configuration directory
+config/
+!config/.gitkeep
+
+# Alternative config directory names users might use
+user-config/
+dns-config/
+my-config/
+production-config/
+
+# =============================================================================
+# CONTAINER DATA & RUNTIME
+# =============================================================================
+
+# Container data directories
+container-data/
+data/
+logs/
+
+# Podman/Docker runtime files
+.container-*
+*.log
+
+# =============================================================================
+# DEVELOPMENT & TESTING
+# =============================================================================
+
+# Test results and temporary files
+tests/results/
+tests/test-configs/
+*.tmp
+*.bak
+*.backup
+
+# Development environment files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# SYSTEM FILES
+# =============================================================================
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+.directory
+
+# =============================================================================
+# SENSITIVE INFORMATION
+# =============================================================================
+
+# Private keys and certificates
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+secrets/
+
+# SSH keys
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
+# =============================================================================
+# DOCUMENTATION BUILDS
+# =============================================================================
+
+# Generated documentation
+docs/_build/
+docs/.doctrees/
+site/
+
+# =============================================================================
+# EXAMPLES TO KEEP
+# =============================================================================
+
+# Keep example configurations (these are templates)
+!config-examples/
+!examples/
+
+# Keep documentation
+!*.md
+!LICENSE
+
+# Keep scripts (but not personal customizations)
+!*.sh
+
+# =============================================================================
+# NOTES FOR USERS
+# =============================================================================
+
+# This .gitignore is designed to:
+# 1. Protect your personal DNS configurations
+# 2. Keep the repository clean for sharing
+# 3. Prevent accidental exposure of sensitive DNS data
+# 4. Allow safe forking and contributions
+#
+# Your personal configurations should go in config/
+# Use config-examples/ as templates for your setup
