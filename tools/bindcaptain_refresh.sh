@@ -123,9 +123,9 @@ check_zones() {
 generate_reverse() {
     if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
         # Running inside container
-        if [ -x "/usr/bin/mkrdns" ]; then
+        if [ -x "/usr/local/bin/mkrdns" ]; then
             log_message "Running mkrdns to generate reverse DNS entries..."
-            /usr/bin/mkrdns > /var/log/mkrdns.log 2>&1
+            /usr/local/bin/mkrdns > /var/log/mkrdns.log 2>&1
             if [[ $(cat /var/log/mkrdns.log) == *Updating* ]]; then
                 log_message "mkrdns detected changes"
                 return 0
@@ -140,9 +140,9 @@ generate_reverse() {
     else
         # Running on host
         if command -v podman &> /dev/null; then
-            if podman exec "$CONTAINER_NAME" test -x /usr/bin/mkrdns; then
+            if podman exec "$CONTAINER_NAME" test -x /usr/local/bin/mkrdns; then
                 log_message "Running mkrdns via container..."
-                podman exec "$CONTAINER_NAME" /usr/bin/mkrdns > "$CONTAINER_DATA_DIR/logs/mkrdns.log" 2>&1
+                podman exec "$CONTAINER_NAME" /usr/local/bin/mkrdns > "$CONTAINER_DATA_DIR/logs/mkrdns.log" 2>&1
                 if [[ $(cat "$CONTAINER_DATA_DIR/logs/mkrdns.log") == *Updating* ]]; then
                     log_message "mkrdns detected changes"
                     return 0
