@@ -15,4 +15,4 @@ Reverse zones enable reverse DNS lookups (IP to hostname resolution) which are:
 - Best practice for professional DNS implementations
 
 ## Automated Generation:
-The `tools/bindcaptain_refresh.sh` script can automatically generate reverse zone entries based on A records in forward zones.
+PTR records are automatically created when A records are added using `bind.create_record`. No external tools or cron jobs are required - reverse DNS is handled inline for immediate consistency.

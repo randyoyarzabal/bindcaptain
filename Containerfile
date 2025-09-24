@@ -18,17 +18,12 @@ RUN dnf update -y && \
         bind-utils \
         bind-chroot \
         hostname \
-        findutils \
-        perl && \
+        findutils && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
 # Verify BIND version for compatibility  
 RUN named -v
-
-# Install mkrdns for automated reverse DNS generation (using existing curl-minimal)
-RUN curl -fsSL https://raw.githubusercontent.com/oasys/mkrdns/master/mkrdns -o /usr/local/bin/mkrdns && \
-    chmod +x /usr/local/bin/mkrdns
 
 # Create required directory structure
 RUN mkdir -p \

@@ -2,7 +2,7 @@
 
 > **Containerized BIND DNS Server with Smart Management**
 
-Modern, containerized BIND DNS solution with automated management, perfect for homelab and enterprise environments.
+Modern, containerized BIND DNS solution with automated management and inline reverse DNS generation, perfect for homelab and enterprise environments.
 
 ## 🚀 Quick Start
 
@@ -64,7 +64,7 @@ sudo ./bindcaptain.sh logs     # View container logs
 sudo ./bindcaptain.sh status   # Check container status
 
 # DNS Record Management (via bindcaptain_manager.sh)
-bind.create_record <hostname> <domain> <ip>     # Add A record
+bind.create_record <hostname> <domain> <ip>     # Add A record + PTR (automatic)
 bind.create_cname <alias> <domain> <target>     # Add CNAME record  
 bind.create_txt <name> <domain> <text>          # Add TXT record
 bind.delete_record <name> <domain> [type]       # Delete record

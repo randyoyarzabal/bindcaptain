@@ -119,47 +119,8 @@ check_zones() {
     return $errors
 }
 
-# Generate reverse DNS if mkrdns is available
-generate_reverse() {
-    if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
-        # Running inside container
-        if [ -x "/usr/local/bin/mkrdns" ]; then
-            log_message "Running mkrdns to generate reverse DNS entries..."
-            /usr/local/bin/mkrdns > /var/log/mkrdns.log 2>&1
-            if [[ $(cat /var/log/mkrdns.log) == *Updating* ]]; then
-                log_message "mkrdns detected changes"
-                return 0
-            else
-                log_message "mkrdns: no changes detected"
-                return 1
-            fi
-        else
-            log_message "mkrdns not found, skipping automatic reverse generation"
-            return 1
-        fi
-    else
-        # Running on host
-        if command -v podman &> /dev/null; then
-            if podman exec "$CONTAINER_NAME" test -x /usr/local/bin/mkrdns; then
-                log_message "Running mkrdns via container..."
-                podman exec "$CONTAINER_NAME" /usr/local/bin/mkrdns > "$CONTAINER_DATA_DIR/logs/mkrdns.log" 2>&1
-                if [[ $(cat "$CONTAINER_DATA_DIR/logs/mkrdns.log") == *Updating* ]]; then
-                    log_message "mkrdns detected changes"
-                    return 0
-                else
-                    log_message "mkrdns: no changes detected"
-                    return 1
-                fi
-            else
-                log_message "mkrdns not found in container, skipping"
-                return 1
-            fi
-        else
-            log_message "Cannot run mkrdns - not in container and podman not available"
-            return 1
-        fi
-    fi
-}
+# Note: Reverse DNS generation moved to inline creation in bindcaptain_manager.sh
+# PTR records are now created automatically when A records are added
 
 # Reload BIND
 reload_bind() {
@@ -206,24 +167,13 @@ if [ -d "$BIND_DIR" ]; then
     fi
 fi
 
-# Run mkrdns if available
-changes_detected=false
-if generate_reverse; then
-    changes_detected=true
-fi
+# Note: PTR records now created inline with A records - no separate generation needed
 
 # Check configuration and zones
 if check_config && check_zones; then
-    if [ "$changes_detected" = true ]; then
-        log_message "Restarting named service due to detected changes"
-        if reload_bind; then
-            log_message "BIND service reloaded successfully"
-        else
-            log_message "ERROR: Failed to reload BIND service"
-        fi
-    else
-        log_message "No changes detected, BIND service not reloaded"
-    fi
+    log_message "Configuration and zone validation passed"
+    # Note: BIND reloading now handled by bindcaptain_manager.sh when records are added
+    log_message "No changes detected, BIND service not reloaded"
 else
     log_message "ERROR: Configuration or zone validation failed, not reloading BIND"
 fi

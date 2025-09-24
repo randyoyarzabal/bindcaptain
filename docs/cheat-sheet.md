@@ -279,25 +279,16 @@ sudo podman exec bindcaptain tail -f /var/log/named/named.log
 
 ## 🔧 Automation & Maintenance
 
-### Cron Status
+### Reverse DNS Automation
+**Note**: As of BindCaptain v2.1+, PTR records are created automatically when A records are added. No cron jobs or external tools required.
+
 ```bash
-# View current crontab
-sudo crontab -l
+# PTR records are created inline - no separate commands needed
+bind.create_record hostname domain.com 192.168.1.100
+# ↑ Creates both A record AND PTR record automatically
 
-# Edit crontab
-sudo crontab -e
-
-# Current schedule: Every 5 minutes
-# */5 * * * * /opt/bindcaptain/tools/bindcaptain_refresh.sh >> /opt/bindcaptain/logs/cron.log 2>&1
-```
-
-### Manual Refresh
-```bash
-# Run refresh script manually
+# Legacy refresh script still available for manual validation
 sudo /opt/bindcaptain/tools/bindcaptain_refresh.sh
-
-# Check what it found
-sudo tail /opt/bindcaptain/logs/dns_refresh.log
 ```
 
 ### Backup Configuration

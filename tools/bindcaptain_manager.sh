@@ -263,6 +263,58 @@ validate_zone() {
     fi
 }
 
+# Create PTR record for given IP and hostname
+create_ptr_record() {
+    local ip_address=$1
+    local hostname=$2
+    local domain=$3
+    
+    # Define networks and their reverse zones
+    local networks=(
+        "172.25.40:40.25.172.in-addr.arpa:reonetlabs.us"
+        "172.25.42:42.25.172.in-addr.arpa:reonetlabs.us" 
+        "172.25.50:50.25.172.in-addr.arpa:reonetlabs.us"
+    )
+    
+    # Determine which reverse zone this IP belongs to
+    for network in "${networks[@]}"; do
+        local subnet=$(echo "$network" | cut -d: -f1)
+        local reverse_zone=$(echo "$network" | cut -d: -f2)
+        local reverse_domain=$(echo "$network" | cut -d: -f3)
+        
+        if [[ "$ip_address" == ${subnet}.* ]]; then
+            local last_octet=$(echo "$ip_address" | cut -d. -f4)
+            local ptr_record="${last_octet}			IN	PTR	${hostname}.${domain}."
+            local reverse_file="$BIND_DIR/${reverse_domain}/${reverse_zone}.db"
+            
+            if [ -f "$reverse_file" ]; then
+                # Check if PTR record already exists for this IP
+                if grep -q "^${last_octet}.*PTR" "$reverse_file"; then
+                    # Remove existing PTR record for this IP
+                    sed -i "/^${last_octet}.*PTR/d" "$reverse_file"
+                    print_status "info" "Removed existing PTR record for $ip_address"
+                fi
+                
+                # Add new PTR record
+                echo "$ptr_record" >> "$reverse_file"
+                
+                # Increment serial number in reverse zone
+                increment_serial "$reverse_file"
+                
+                print_status "success" "PTR record created: $ip_address -> ${hostname}.${domain}"
+                log_action "Created PTR record: $ip_address -> ${hostname}.${domain}"
+                return 0
+            else
+                print_status "warning" "Reverse zone file not found: $reverse_file"
+                return 1
+            fi
+        fi
+    done
+    
+    print_status "warning" "No matching reverse zone found for IP: $ip_address"
+    return 1
+}
+
 # Function: bind.create_record
 bind.create_record() {
     local show_help=false
@@ -370,6 +422,10 @@ bind.create_record() {
     
     if validate_zone "$domain"; then
         reload_bind
+        
+        # Create corresponding PTR record
+        create_ptr_record "$ip_address" "$hostname" "$domain"
+        
         print_status "success" "A record created: $hostname.$domain -> $ip_address"
         log_action "Created A record: $hostname.$domain -> $ip_address"
     else
