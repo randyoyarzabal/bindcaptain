@@ -40,7 +40,6 @@ options {
     
     // Memory and performance tuning
     max-cache-size 100M;
-    cleaning-interval 60;
     
     // Paths and files
     managed-keys-directory "/var/named/dynamic";
@@ -83,8 +82,8 @@ zone "YOUR_DOMAIN.com" IN {
     file "YOUR_DOMAIN.com.db";
     check-names warn;
     notify primary-only;  // Modern term for 'notify master-only'
-    also-notify { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
-    allow-transfer { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
+    also-notify { 192.168.1.10; 192.168.1.11; };
+    allow-transfer { 192.168.1.10; 192.168.1.11; };
     allow-query { any; };
 };
 
@@ -94,8 +93,8 @@ zone "YOUR_REVERSE_ZONE.in-addr.arpa" IN {
     file "YOUR_REVERSE_ZONE.in-addr.arpa.db";
     check-names warn;
     notify primary-only;
-    also-notify { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
-    allow-transfer { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
+    also-notify { 192.168.1.10; 192.168.1.11; };
+    allow-transfer { 192.168.1.10; 192.168.1.11; };
     allow-query { any; };
 };
 
