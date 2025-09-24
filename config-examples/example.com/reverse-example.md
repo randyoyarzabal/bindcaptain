@@ -15,4 +15,4 @@ Reverse zones enable reverse DNS lookups (IP to hostname resolution) which are:
 - Best practice for professional DNS implementations
 
 ## Automated Generation:
-The `bindcaptain_refresh.sh` script can automatically generate reverse zone entries based on A records in forward zones.
+The `tools/bindcaptain_refresh.sh` script can automatically generate reverse zone entries based on A records in forward zones.

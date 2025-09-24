@@ -35,8 +35,8 @@ sudo bash -c "source ./bindcaptain_manager.sh && bind.create_record webserver yo
 ## 📝 DNS Management
 
 ```bash
-# Source the manager
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh"
+    # Source the manager
+    sudo bash -c "source /opt/bindcaptain/tools/bindcaptain_manager.sh"
 
 # Add DNS records
 bind.create_record webserver yourdomain.com 192.168.1.100
@@ -93,7 +93,7 @@ If you need to install Podman and container tools:
 
 ```bash
 # Rocky Linux 9 / CentOS Stream 9 / AlmaLinux 9
-sudo ./setup.sh  # Installs Podman, git, bind-utils
+    sudo ./tools/setup.sh  # Installs Podman, git, bind-utils
 ```
 
 See [docs/setup-system.md](docs/setup-system.md) for detailed system setup.

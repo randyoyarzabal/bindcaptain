@@ -288,13 +288,13 @@ sudo crontab -l
 sudo crontab -e
 
 # Current schedule: Every 5 minutes
-# */5 * * * * /opt/bindcaptain/bindcaptain_refresh.sh >> /opt/bindcaptain/logs/cron.log 2>&1
+# */5 * * * * /opt/bindcaptain/tools/bindcaptain_refresh.sh >> /opt/bindcaptain/logs/cron.log 2>&1
 ```
 
 ### Manual Refresh
 ```bash
 # Run refresh script manually
-sudo /opt/bindcaptain/bindcaptain_refresh.sh
+sudo /opt/bindcaptain/tools/bindcaptain_refresh.sh
 
 # Check what it found
 sudo tail /opt/bindcaptain/logs/dns_refresh.log
@@ -386,7 +386,7 @@ sudo podman start bindcaptain
 | **Edit Zone** | `sudo vi /opt/bindcaptain/config/domain/domain.db` |
 | **Validate Zone** | `sudo named-checkzone domain /opt/bindcaptain/config/domain/domain.db` |
 | **Test DNS** | `dig @172.25.50.156 hostname.domain.com` |
-| **Manual Refresh** | `sudo /opt/bindcaptain/bindcaptain_refresh.sh` |
+| **Manual Refresh** | `sudo /opt/bindcaptain/tools/bindcaptain_refresh.sh` |
 | **Backup Config** | `sudo tar -czf backup.tar.gz /opt/bindcaptain/config/` |
 
 ---

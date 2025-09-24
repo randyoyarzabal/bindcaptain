@@ -106,11 +106,11 @@ test_project_structure() {
     
     local required_files=(
         "bindcaptain.sh"
-        "bindcaptain_manager.sh"
-        "bindcaptain_refresh.sh"
+        "tools/bindcaptain_manager.sh"
+        "tools/bindcaptain_refresh.sh"
         "Containerfile"
-        "container_start.sh"
-        "setup.sh"
+        "tools/container_start.sh"
+        "tools/setup.sh"
         "README.md"
         "LICENSE"
     )
@@ -144,9 +144,9 @@ test_script_syntax() {
     
     local scripts=(
         "bindcaptain.sh"
-        "bindcaptain_manager.sh"
-        "bindcaptain_refresh.sh"
-        "container_start.sh"
+        "tools/bindcaptain_manager.sh"
+        "tools/bindcaptain_refresh.sh"
+        "tools/container_start.sh"
         "setup.sh"
     )
     

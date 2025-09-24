@@ -84,7 +84,7 @@ RUN chown -R named:named /var/named /var/log/named /var/run/named && \
 RUN rndc-confgen -a || true
 
 # Copy container startup script
-COPY container_start.sh /usr/local/bin/
+COPY tools/container_start.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/container_start.sh
 
 # Expose DNS ports

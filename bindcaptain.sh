@@ -186,8 +186,8 @@ copy_user_config() {
     fi
     
     # Copy management scripts
-    cp "$SCRIPT_DIR/bindcaptain_manager.sh" "$CONTAINER_DATA_DIR/scripts/"
-    cp "$SCRIPT_DIR/bindcaptain_refresh.sh" "$CONTAINER_DATA_DIR/scripts/"
+    cp "$SCRIPT_DIR/tools/bindcaptain_manager.sh" "$CONTAINER_DATA_DIR/scripts/"
+    cp "$SCRIPT_DIR/tools/bindcaptain_refresh.sh" "$CONTAINER_DATA_DIR/scripts/"
     
     # Set proper permissions
     chown -R root:root "$CONTAINER_DATA_DIR/config" "$CONTAINER_DATA_DIR/scripts"
