@@ -767,6 +767,95 @@ bind.list_records() {
     done
 }
 
+# Function: bind.git_refresh
+bind.git_refresh() {
+    if [[ "$1" == "--help" ]] || [[ "$1" == "-?" ]]; then
+        print_status "info" "bind.git_refresh - Update BindCaptain codebase from GitHub"
+        echo
+        echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.git_refresh [--force]"
+        echo
+        echo -e "${YELLOW}Description:${NC}"
+        echo "  Updates the BindCaptain codebase from the GitHub repository"
+        echo "  Preserves your local configuration files"
+        echo
+        echo -e "${YELLOW}Options:${NC}"
+        echo "  --force    Force update even if there are uncommitted changes"
+        echo
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.git_refresh           # Standard update"
+        echo "  bind.git_refresh --force   # Force update"
+        return 0
+    fi
+
+    print_status "info" "Updating BindCaptain codebase from GitHub..."
+    
+    local force_update="false"
+    if [[ "$1" == "--force" ]]; then
+        force_update="true"
+    fi
+    
+    # Determine the correct directory
+    local bindcaptain_dir
+    if [[ -d "/opt/bindcaptain" ]]; then
+        bindcaptain_dir="/opt/bindcaptain"
+    elif [[ -d "/home/techno/bind" ]]; then
+        bindcaptain_dir="/home/techno/bind"
+    else
+        print_status "error" "BindCaptain directory not found"
+        return 1
+    fi
+    
+    print_status "info" "Working in: $bindcaptain_dir"
+    
+    # Change to the directory
+    cd "$bindcaptain_dir" || {
+        print_status "error" "Failed to access $bindcaptain_dir"
+        return 1
+    }
+    
+    # Check if it's a git repository
+    if [[ ! -d ".git" ]]; then
+        print_status "error" "Not a git repository. Initialize with: git clone https://github.com/randyoyarzabal/bindcaptain.git"
+        return 1
+    fi
+    
+    # Backup config if it exists
+    if [[ -d "config" ]]; then
+        print_status "info" "Backing up local configuration..."
+        cp -r config config.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+    fi
+    
+    # Check for uncommitted changes
+    if ! $force_update && [[ -n "$(git status --porcelain)" ]]; then
+        print_status "warning" "Uncommitted changes detected. Use --force to proceed anyway"
+        git status --short
+        return 1
+    fi
+    
+    # Fetch and pull latest changes
+    print_status "info" "Fetching latest changes from GitHub..."
+    git fetch origin || {
+        print_status "error" "Failed to fetch from remote repository"
+        return 1
+    }
+    
+    # Get current branch
+    local current_branch
+    current_branch=$(git branch --show-current)
+    
+    print_status "info" "Updating branch: $current_branch"
+    git pull origin "$current_branch" || {
+        print_status "error" "Failed to pull changes. You may need to resolve conflicts manually"
+        return 1
+    }
+    
+    print_status "success" "BindCaptain codebase updated successfully!"
+    print_status "info" "If you have a running container, restart it with: sudo /opt/bindcaptain/bindcaptain.sh restart"
+    
+    return 0
+}
+
 # Show environment info
 show_environment() {
     print_header
@@ -806,25 +895,29 @@ main() {
         bind.create_txt)
             bind.create_txt "$@"
             ;;
-        bind.delete_record)
-            bind.delete_record "$@"
-            ;;
-        bind.list_records)
-            bind.list_records "$@"
-            ;;
-        show_environment)
-            show_environment "$@"
-            ;;
+            bind.delete_record)
+                bind.delete_record "$@"
+                ;;
+            bind.list_records)
+                bind.list_records "$@"
+                ;;
+            bind.git_refresh)
+                bind.git_refresh "$@"
+                ;;
+            show_environment)
+                show_environment "$@"
+                ;;
         *)
             print_header
             echo -e "${WHITE}Available Commands:${NC}"
             echo
-            echo -e "  ${GREEN}bind.create_record${NC}  - Create DNS A record"
-            echo -e "  ${GREEN}bind.create_cname${NC}   - Create DNS CNAME record"
-            echo -e "  ${GREEN}bind.create_txt${NC}     - Create DNS TXT record"
-            echo -e "  ${GREEN}bind.delete_record${NC}  - Delete DNS record"
-            echo -e "  ${GREEN}bind.list_records${NC}   - List DNS records"
-            echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
+                echo -e "  ${GREEN}bind.create_record${NC}  - Create DNS A record"
+                echo -e "  ${GREEN}bind.create_cname${NC}   - Create DNS CNAME record"
+                echo -e "  ${GREEN}bind.create_txt${NC}     - Create DNS TXT record"
+                echo -e "  ${GREEN}bind.delete_record${NC}  - Delete DNS record"
+                echo -e "  ${GREEN}bind.list_records${NC}   - List DNS records"
+                echo -e "  ${GREEN}bind.git_refresh${NC}    - Update codebase from GitHub"
+                echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
             echo
             echo -e "${YELLOW}Usage:${NC}"
             echo "  source $0"
