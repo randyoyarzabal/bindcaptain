@@ -122,10 +122,10 @@ config/
 ├── example.com/            # Template domain
 │   ├── example.com.db      # Zone file
 │   └── README.md           # Documentation
-├── homelab.io/             # Homelab domain
-│   └── homelab.io.db       # Zone file
-└── reonetlabs.us/          # Network authority domain
-    ├── reonetlabs.us.db    # Forward zone file
+├── example.com/            # Example domain
+│   └── example.com.db      # Zone file
+└── mydomain.net/           # Network authority domain
+    ├── mydomain.net.db     # Forward zone file
     ├── 40.25.172.in-addr.arpa.db  # Reverse zones
     ├── 42.25.172.in-addr.arpa.db  # (consolidated)
     └── 50.25.172.in-addr.arpa.db  # by authority
@@ -141,7 +141,7 @@ zone "example.com" IN {
 
 zone "1.168.192.in-addr.arpa" IN {
     type primary;
-    file "reonetlabs.us/1.168.192.in-addr.arpa.db";  # Consolidated in authority domain
+    file "mydomain.net/1.168.192.in-addr.arpa.db";  # Consolidated in authority domain
     ...
 };
 ```
@@ -282,17 +282,17 @@ The CI pipeline includes:
 
 ### **Domain-Specific Features**
 
-#### **homelab.io** - OpenShift Integration:
+#### **example.com** - Development Environment:
 - Multiple OpenShift clusters
 - Container infrastructure
 - Development environments
 
-#### **reonetlabs.us** - Production Infrastructure:
+#### **mydomain.net** - Production Infrastructure:
 - Proxmox VE clusters
 - Network management
 - Production services
 
-#### **example.com** - Template Domain:
+#### **Template Configuration:**
 - Starting point for new domains
 - Well-documented structure
 - Best practices implementation

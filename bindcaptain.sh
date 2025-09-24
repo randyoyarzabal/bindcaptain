@@ -6,14 +6,14 @@
 set -e
 
 # Configuration
-CONTAINER_NAME="bind-dns"
-IMAGE_NAME="bind-dns"
+CONTAINER_NAME="bindcaptain"
+IMAGE_NAME="bindcaptain"
 IMAGE_TAG="latest"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default paths (can be overridden by user)
-USER_CONFIG_DIR="${USER_CONFIG_DIR:-$SCRIPT_DIR/user-config}"
-CONTAINER_DATA_DIR="${CONTAINER_DATA_DIR:-/opt/bind-dns}"
+USER_CONFIG_DIR="${USER_CONFIG_DIR:-$SCRIPT_DIR/config}"
+CONTAINER_DATA_DIR="${CONTAINER_DATA_DIR:-/opt/bindcaptain}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -75,7 +75,7 @@ validate_user_config() {
         print_status "error" "User configuration directory not found: $USER_CONFIG_DIR"
         echo "  Please create your configuration directory with:"
         echo "  mkdir -p $USER_CONFIG_DIR"
-        echo "  cp examples/* $USER_CONFIG_DIR/"
+        echo "  cp config-examples/* $USER_CONFIG_DIR/"
         echo "  # Edit files in $USER_CONFIG_DIR/ for your setup"
         exit 1
     fi
@@ -95,7 +95,7 @@ validate_user_config() {
         for file in "${missing_files[@]}"; do
             echo "    - $file"
         done
-        echo "  Copy examples: cp examples/* $USER_CONFIG_DIR/"
+        echo "  Copy examples: cp config-examples/* $USER_CONFIG_DIR/"
         exit 1
     fi
     
@@ -174,11 +174,11 @@ create_directories() {
 copy_user_config() {
     print_status "info" "Copying user configuration to container directories..."
     
-    # Copy main configuration
-    cp "$USER_CONFIG_DIR/named.conf" "$CONTAINER_DATA_DIR/config/"
+    # Copy main configuration (preserve permissions)
+    cp -p "$USER_CONFIG_DIR/named.conf" "$CONTAINER_DATA_DIR/config/"
     
-    # Copy zone files
-    find "$USER_CONFIG_DIR" -name "*.db" -exec cp {} "$CONTAINER_DATA_DIR/zones/" \;
+    # Copy zone files (preserve permissions)
+    find "$USER_CONFIG_DIR" -name "*.db" -exec cp -p {} "$CONTAINER_DATA_DIR/zones/" \;
     
     # Copy scripts if they exist
     if [ -d "$USER_CONFIG_DIR/scripts" ]; then
@@ -186,8 +186,8 @@ copy_user_config() {
     fi
     
     # Copy management scripts
-    cp "$SCRIPT_DIR/bind_manager.sh" "$CONTAINER_DATA_DIR/scripts/"
-    cp "$SCRIPT_DIR/refresh_named.sh" "$CONTAINER_DATA_DIR/scripts/"
+    cp "$SCRIPT_DIR/bindcaptain_manager.sh" "$CONTAINER_DATA_DIR/scripts/"
+    cp "$SCRIPT_DIR/bindcaptain_refresh.sh" "$CONTAINER_DATA_DIR/scripts/"
     
     # Set proper permissions
     chown -R root:root "$CONTAINER_DATA_DIR/config" "$CONTAINER_DATA_DIR/scripts"
@@ -305,7 +305,7 @@ show_info() {
     echo "  Stop container:  sudo podman stop $CONTAINER_NAME"
     echo "  Restart:         sudo podman restart $CONTAINER_NAME"
     echo "  Test DNS:        dig @$bind_ip \$(first_zone_name)"
-    echo "  Manage DNS:      sudo podman exec $CONTAINER_NAME /usr/local/scripts/bind_manager.sh"
+    echo "  Manage DNS:      sudo podman exec $CONTAINER_NAME /usr/local/scripts/bindcaptain_manager.sh"
     echo
 }
 
@@ -317,7 +317,7 @@ show_help() {
     echo "Usage: $0 [COMMAND] [OPTIONS]"
     echo
     echo "Environment Variables:"
-    echo "  USER_CONFIG_DIR      - Directory with your BIND configuration (default: ./user-config)"
+    echo "  USER_CONFIG_DIR      - Directory with your BIND configuration (default: ./config)"
     echo "  CONTAINER_DATA_DIR   - Container data directory (default: /opt/bind-dns)"
     echo "  BIND_DEBUG_LEVEL     - BIND debug level (default: 1)"
     echo "  TZ                   - Timezone (default: UTC)"
@@ -335,7 +335,7 @@ show_help() {
     echo "  help          - Show this help"
     echo
     echo "Examples:"
-    echo "  # Use default user-config directory"
+    echo "  # Use default config directory"
     echo "  sudo $0 run"
     echo
     echo "  # Use custom configuration directory"

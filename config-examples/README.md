@@ -168,3 +168,4 @@ named-checkzone yourdomain.com config/yourdomain.com/yourdomain.com.db
 ---
 
 *These templates provide a solid foundation for professional DNS infrastructure management with BindCaptain.*
+

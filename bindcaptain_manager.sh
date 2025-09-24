@@ -5,8 +5,8 @@
 # Take command of your DNS records with confidence
 
 # Container configuration
-CONTAINER_NAME="bind-dns"
-CONTAINER_DATA_DIR="/opt/bind-dns"
+CONTAINER_NAME="bindcaptain"
+CONTAINER_DATA_DIR="/opt/bindcaptain"
 DOMAIN_CONFIG_BASE="/var/named"
 
 # Use container paths if running in container, host paths if running on host
@@ -17,8 +17,8 @@ if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
     LOG_FILE="/var/log/bind_manager.log"
     BACKUP_DIR="/var/backups/bind"
 else
-    # Running on host - target container volumes
-    BIND_DIR="$CONTAINER_DATA_DIR/zones"
+    # Running on host - target the same config the container uses
+    BIND_DIR="$CONTAINER_DATA_DIR/config"
     NAMED_CONF="$CONTAINER_DATA_DIR/config/named.conf"
     LOG_FILE="$CONTAINER_DATA_DIR/logs/bind_manager.log"
     BACKUP_DIR="$CONTAINER_DATA_DIR/backups"
@@ -312,7 +312,10 @@ bind.create_record() {
         return 1
     fi
     
-    local zone_file="$BIND_DIR/${domain}.db"
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
     
     # Check if record already exists
     if grep -q "^${hostname}\s" "$zone_file"; then
@@ -349,6 +352,331 @@ bind.create_record() {
         reload_bind
         print_status "success" "A record created: $hostname.$domain -> $ip_address"
         log_action "Created A record: $hostname.$domain -> $ip_address"
+    else
+        print_status "error" "Zone validation failed, restoring backup"
+        # Restore from backup
+        local latest_backup=$(ls -t "$BACKUP_DIR/${domain}.db.backup."* 2>/dev/null | head -1)
+        if [ -n "$latest_backup" ]; then
+            cp "$latest_backup" "$zone_file"
+            print_status "info" "Backup restored"
+        fi
+        return 1
+    fi
+}
+
+# Function: bind.create_cname
+bind.create_cname() {
+    local show_help=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -?|--help)
+                show_help=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    
+    if [ "$show_help" = true ] || [ $# -lt 3 ]; then
+        echo -e "${WHITE}bind.create_cname${NC} - Create DNS CNAME record"
+        echo
+        echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.create_cname <alias> <domain> <target>"
+        echo
+        echo -e "${YELLOW}Parameters:${NC}"
+        echo -e "  ${GREEN}alias${NC}      - Alias name (without domain)"
+        echo -e "  ${GREEN}domain${NC}     - Domain name (from: ${DOMAINS[*]:-auto-discovered})"
+        echo -e "  ${GREEN}target${NC}     - Target hostname (can include domain)"
+        echo
+        echo -e "${YELLOW}Available Domains:${NC}"
+        for domain in "${DOMAINS[@]}"; do
+            echo "  - $domain"
+        done
+        echo
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.create_cname www ${DOMAINS[0]:-example.com} webserver"
+        echo "  bind.create_cname ftp ${DOMAINS[0]:-example.com} webserver.${DOMAINS[0]:-example.com}."
+        return 0
+    fi
+    
+    local alias=$1
+    local domain=$2
+    local target=$3
+    
+    print_header
+    echo -e "${WHITE}Creating CNAME Record${NC}"
+    echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
+    echo "Alias: $alias"
+    echo "Domain: $domain"
+    echo "Target: $target"
+    echo
+    
+    # Validations
+    if ! validate_hostname "$alias"; then
+        print_status "error" "Invalid alias: $alias"
+        return 1
+    fi
+    
+    if ! validate_domain "$domain"; then
+        print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
+        return 1
+    fi
+    
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
+    
+    # Check if record already exists
+    if grep -q "^${alias}\s" "$zone_file"; then
+        print_status "warning" "Record $alias already exists in $domain"
+        read -p "Overwrite existing record? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "info" "Operation cancelled"
+            return 0
+        fi
+        # Remove existing record
+        sed -i "/^${alias}\s/d" "$zone_file"
+    fi
+    
+    # Backup zone file
+    backup_zone "$domain"
+    
+    # Add new CNAME record
+    local record_line="${alias}                 IN      CNAME   ${target}"
+    
+    # Find the right place to insert (after CNAME Records comment, before other sections)
+    if grep -q "; CNAME Records" "$zone_file"; then
+        sed -i "/; CNAME Records/a\\$record_line" "$zone_file"
+    elif grep -q "; A Records" "$zone_file"; then
+        # Insert after A Records section
+        sed -i "/; A Records/,/^$/a\\$record_line" "$zone_file"
+    else
+        echo "$record_line" >> "$zone_file"
+    fi
+    
+    # Increment serial and validate
+    increment_serial "$zone_file"
+    
+    if validate_zone "$domain"; then
+        reload_bind
+        print_status "success" "CNAME record created: $alias.$domain -> $target"
+        log_action "Created CNAME record: $alias.$domain -> $target"
+    else
+        print_status "error" "Zone validation failed, restoring backup"
+        # Restore from backup
+        local latest_backup=$(ls -t "$BACKUP_DIR/${domain}.db.backup."* 2>/dev/null | head -1)
+        if [ -n "$latest_backup" ]; then
+            cp "$latest_backup" "$zone_file"
+            print_status "info" "Backup restored"
+        fi
+        return 1
+    fi
+}
+
+# Function: bind.create_txt
+bind.create_txt() {
+    local show_help=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -?|--help)
+                show_help=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    
+    if [ "$show_help" = true ] || [ $# -lt 3 ]; then
+        echo -e "${WHITE}bind.create_txt${NC} - Create DNS TXT record"
+        echo
+        echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.create_txt <name> <domain> <text_value>"
+        echo
+        echo -e "${YELLOW}Parameters:${NC}"
+        echo -e "  ${GREEN}name${NC}       - Record name (without domain, use @ for domain root)"
+        echo -e "  ${GREEN}domain${NC}     - Domain name (from: ${DOMAINS[*]:-auto-discovered})"
+        echo -e "  ${GREEN}text_value${NC} - Text value (will be quoted automatically)"
+        echo
+        echo -e "${YELLOW}Available Domains:${NC}"
+        for domain in "${DOMAINS[@]}"; do
+            echo "  - $domain"
+        done
+        echo
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.create_txt @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
+        echo "  bind.create_txt _dmarc ${DOMAINS[0]:-example.com} 'v=DMARC1; p=none'"
+        return 0
+    fi
+    
+    local name=$1
+    local domain=$2
+    local text_value="$3"
+    
+    print_header
+    echo -e "${WHITE}Creating TXT Record${NC}"
+    echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
+    echo "Name: $name"
+    echo "Domain: $domain"
+    echo "Text: $text_value"
+    echo
+    
+    # Validations
+    if [ "$name" != "@" ] && ! validate_hostname "$name"; then
+        print_status "error" "Invalid name: $name"
+        return 1
+    fi
+    
+    if ! validate_domain "$domain"; then
+        print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
+        return 1
+    fi
+    
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
+    
+    # Backup zone file
+    backup_zone "$domain"
+    
+    # Add new TXT record
+    local record_line="${name}                 IN      TXT     \"${text_value}\""
+    
+    # Find the right place to insert (append to end of file)
+    echo "$record_line" >> "$zone_file"
+    
+    # Increment serial and validate
+    increment_serial "$zone_file"
+    
+    if validate_zone "$domain"; then
+        reload_bind
+        print_status "success" "TXT record created: $name.$domain -> \"$text_value\""
+        log_action "Created TXT record: $name.$domain -> \"$text_value\""
+    else
+        print_status "error" "Zone validation failed, restoring backup"
+        # Restore from backup
+        local latest_backup=$(ls -t "$BACKUP_DIR/${domain}.db.backup."* 2>/dev/null | head -1)
+        if [ -n "$latest_backup" ]; then
+            cp "$latest_backup" "$zone_file"
+            print_status "info" "Backup restored"
+        fi
+        return 1
+    fi
+}
+
+# Function: bind.delete_record
+bind.delete_record() {
+    local show_help=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -?|--help)
+                show_help=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    
+    if [ "$show_help" = true ] || [ $# -lt 2 ]; then
+        echo -e "${WHITE}bind.delete_record${NC} - Delete DNS record"
+        echo
+        echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.delete_record <name> <domain> [record_type]"
+        echo
+        echo -e "${YELLOW}Parameters:${NC}"
+        echo -e "  ${GREEN}name${NC}        - Record name (without domain)"
+        echo -e "  ${GREEN}domain${NC}      - Domain name (from: ${DOMAINS[*]:-auto-discovered})"
+        echo -e "  ${GREEN}record_type${NC} - Record type (A, CNAME, TXT, etc) - optional"
+        echo
+        echo -e "${YELLOW}Available Domains:${NC}"
+        for domain in "${DOMAINS[@]}"; do
+            echo "  - $domain"
+        done
+        echo
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.delete_record webserver ${DOMAINS[0]:-example.com}"
+        echo "  bind.delete_record www ${DOMAINS[0]:-example.com} CNAME"
+        return 0
+    fi
+    
+    local name=$1
+    local domain=$2
+    local record_type=${3:-""}
+    
+    print_header
+    echo -e "${WHITE}Deleting DNS Record${NC}"
+    echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
+    echo "Name: $name"
+    echo "Domain: $domain"
+    [ -n "$record_type" ] && echo "Type: $record_type"
+    echo
+    
+    # Validations
+    if ! validate_hostname "$name"; then
+        print_status "error" "Invalid name: $name"
+        return 1
+    fi
+    
+    if ! validate_domain "$domain"; then
+        print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
+        return 1
+    fi
+    
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
+    
+    # Check if record exists
+    local search_pattern="^${name}\s"
+    if [ -n "$record_type" ]; then
+        search_pattern="^${name}\s.*IN\s*${record_type}\s"
+    fi
+    
+    if ! grep -q "$search_pattern" "$zone_file"; then
+        print_status "error" "Record $name not found in $domain"
+        return 1
+    fi
+    
+    # Show what will be deleted
+    echo -e "${YELLOW}Records to be deleted:${NC}"
+    grep "$search_pattern" "$zone_file"
+    echo
+    
+    read -p "Delete these records? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_status "info" "Operation cancelled"
+        return 0
+    fi
+    
+    # Backup zone file
+    backup_zone "$domain"
+    
+    # Delete records
+    sed -i "/$search_pattern/d" "$zone_file"
+    
+    # Increment serial and validate
+    increment_serial "$zone_file"
+    
+    if validate_zone "$domain"; then
+        reload_bind
+        print_status "success" "Record(s) deleted: $name from $domain"
+        log_action "Deleted record: $name from $domain"
     else
         print_status "error" "Zone validation failed, restoring backup"
         # Restore from backup
@@ -418,7 +746,11 @@ bind.list_records() {
     fi
     
     for d in "${domains[@]}"; do
-        local zone_file="$BIND_DIR/${d}.db"
+        local zone_file="$BIND_DIR/${d}/${d}.db"
+        if [ ! -f "$zone_file" ]; then
+            zone_file="$BIND_DIR/${d}.db"
+        fi
+        
         if [ ! -f "$zone_file" ]; then
             print_status "warning" "Zone file not found for $d"
             continue
@@ -468,6 +800,15 @@ main() {
         bind.create_record)
             bind.create_record "$@"
             ;;
+        bind.create_cname)
+            bind.create_cname "$@"
+            ;;
+        bind.create_txt)
+            bind.create_txt "$@"
+            ;;
+        bind.delete_record)
+            bind.delete_record "$@"
+            ;;
         bind.list_records)
             bind.list_records "$@"
             ;;
@@ -479,6 +820,9 @@ main() {
             echo -e "${WHITE}Available Commands:${NC}"
             echo
             echo -e "  ${GREEN}bind.create_record${NC}  - Create DNS A record"
+            echo -e "  ${GREEN}bind.create_cname${NC}   - Create DNS CNAME record"
+            echo -e "  ${GREEN}bind.create_txt${NC}     - Create DNS TXT record"
+            echo -e "  ${GREEN}bind.delete_record${NC}  - Delete DNS record"
             echo -e "  ${GREEN}bind.list_records${NC}   - List DNS records"
             echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
             echo

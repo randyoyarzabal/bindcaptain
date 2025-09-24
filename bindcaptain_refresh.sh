@@ -4,8 +4,8 @@
 # Automated DNS refresh and maintenance for BindCaptain
 
 # Container configuration
-CONTAINER_NAME="bind-dns"
-CONTAINER_DATA_DIR="/opt/bind-dns"
+CONTAINER_NAME="bindcaptain"
+CONTAINER_DATA_DIR="/opt/bindcaptain"
 DOMAIN_CONFIG_BASE="/var/named"
 
 # Use container paths if running in container, host paths if running on host
@@ -15,8 +15,8 @@ if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
     LOG_FILE="/var/log/dns_refresh.log"
     NAMED_CONF="/etc/named.conf"
 else
-    # Running on host - target container volumes
-    BIND_DIR="$CONTAINER_DATA_DIR/zones"
+    # Running on host - target the same config the container uses
+    BIND_DIR="$CONTAINER_DATA_DIR/config"
     LOG_FILE="$CONTAINER_DATA_DIR/logs/dns_refresh.log"
     NAMED_CONF="$CONTAINER_DATA_DIR/config/named.conf"
 fi
@@ -78,7 +78,18 @@ check_zones() {
     local zones=($(discover_zones))
     
     for zone in "${zones[@]}"; do
-        local zone_file="$BIND_DIR/${zone}.db"
+        # Find zone file in domain-specific subdirectories
+        local zone_file=""
+        if [ -f "$BIND_DIR/${zone}/${zone}.db" ]; then
+            zone_file="$BIND_DIR/${zone}/${zone}.db"
+        elif [ -f "$BIND_DIR/${zone}.db" ]; then
+            zone_file="$BIND_DIR/${zone}.db"
+        fi
+        
+        if [ -z "$zone_file" ]; then
+            log_message "WARNING: Zone file for $zone not found"
+            continue
+        fi
         
         if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
             # Running inside container
@@ -91,7 +102,9 @@ check_zones() {
         else
             # Running on host - check via container
             if command -v podman &> /dev/null; then
-                if podman exec "$CONTAINER_NAME" named-checkzone "$zone" "/var/named/$(basename "$zone_file")" >/dev/null 2>&1; then
+                # Convert host path to container path
+                local container_zone_file=$(echo "$zone_file" | sed "s|$BIND_DIR|/var/named|")
+                if podman exec "$CONTAINER_NAME" named-checkzone "$zone" "$container_zone_file" >/dev/null 2>&1; then
                     log_message "Zone $zone is valid"
                 else
                     log_message "ERROR: Zone $zone has errors"
