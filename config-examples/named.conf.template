@@ -1,0 +1,104 @@
+// BIND Configuration Template (Compatible with BIND 9.16+)
+// Copy this to user-config/named.conf and customize for your setup
+// Updated for BIND 9.20+ syntax and security best practices
+
+options {
+    listen-on port 53 { YOUR_DNS_SERVER_IP; };
+    listen-on-v6 port 53 { ::1; };
+    directory       "/var/named";
+    dump-file       "/var/named/data/cache_dump.db";
+    statistics-file "/var/named/data/named_stats.txt";
+    memstatistics-file "/var/named/data/named_mem_stats.txt";
+    secroots-file   "/var/named/data/named.secroots";
+    recursing-file  "/var/named/data/named.recursing";
+    allow-query     { localhost; YOUR_NETWORK/16; };
+    
+    /*
+     - If you are building an AUTHORITATIVE DNS server, do NOT enable recursion.
+     - If you are building a RECURSIVE (caching) DNS server, you need to enable
+       recursion.
+     - If your recursive DNS server has a public IP address, you MUST enable access
+       control to limit queries to your legitimate users.
+    */
+    recursion yes;
+    
+    // Modern DNSSEC configuration (auto-validation recommended)
+    dnssec-validation auto;
+    
+    // Security enhancements
+    auth-nxdomain no;    // RFC 1035 compliance
+    
+    // Rate limiting to prevent DNS amplification attacks
+    rate-limit {
+        responses-per-second 10;
+        window 5;
+    };
+    
+    // Additional security options
+    version none;        // Hide BIND version
+    hostname none;       // Hide hostname
+    
+    // Memory and performance tuning
+    max-cache-size 100M;
+    cleaning-interval 60;
+    
+    // Paths and files
+    managed-keys-directory "/var/named/dynamic";
+    pid-file "/run/named/named.pid";
+    session-keyfile "/run/named/session.key";
+    
+    // Crypto policies support (uncomment if using RHEL/Rocky crypto policies)
+    // include "/etc/crypto-policies/back-ends/bind.config";
+};
+
+// Improved logging configuration
+logging {
+    channel default_file {
+        file "/var/log/named/named.log" versions 3 size 5m;
+        severity info;
+        print-time yes;
+        print-severity yes;
+        print-category yes;
+    };
+    channel security_file {
+        file "/var/log/named/security.log" versions 3 size 5m;
+        severity info;
+        print-time yes;
+        print-severity yes;
+        print-category yes;
+    };
+    category default { default_file; };
+    category security { security_file; };
+};
+
+// Root hints zone
+zone "." IN {
+    type hint;
+    file "named.ca";
+};
+
+// Forward zone for your domain (using modern 'primaries' terminology)
+zone "YOUR_DOMAIN.com" IN {
+    type primary;  // Modern term for 'master'
+    file "YOUR_DOMAIN.com.db";
+    check-names warn;
+    notify primary-only;  // Modern term for 'notify master-only'
+    also-notify { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
+    allow-transfer { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
+    allow-query { any; };
+};
+
+// Reverse zone for your network
+zone "YOUR_REVERSE_ZONE.in-addr.arpa" IN {
+    type primary;
+    file "YOUR_REVERSE_ZONE.in-addr.arpa.db";
+    check-names warn;
+    notify primary-only;
+    also-notify { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
+    allow-transfer { YOUR_SECONDARY_DNS_1; YOUR_SECONDARY_DNS_2; };
+    allow-query { any; };
+};
+
+// Standard zones (required)
+include "/etc/named.rfc1912.zones";
+include "/etc/named.root.key";

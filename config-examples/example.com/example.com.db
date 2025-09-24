@@ -1,0 +1,24 @@
+$ORIGIN .
+$TTL 86400	; 1 day
+example.com		IN SOA	ns1.example.com. admin.example.com. (
+				2024092401     ; serial
+				43200          ; refresh (12 hours)
+				180            ; retry (3 minutes)
+				1209600        ; expire (2 weeks)
+				10800          ; minimum (3 hours)
+				)
+			NS	ns1.example.com.
+
+$ORIGIN example.com.
+; A Records
+ns1                     IN      A       172.25.50.156
+web                     IN      A       172.25.50.100
+mail                    IN      A       172.25.50.101
+ftp                     IN      A       172.25.50.102
+db                      IN      A       172.25.50.103
+
+; CNAME Records
+www                     IN      CNAME   web
+smtp                    IN      CNAME   mail
+pop3                    IN      CNAME   mail
+imap                    IN      CNAME   mail

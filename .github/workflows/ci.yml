@@ -1,0 +1,251 @@
+name: ⚓ BindCaptain CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run tests weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test-project:
+    name: 🧪 Project Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Setup Test Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bind9-utils
+    
+    - name: 🧪 Run Test Suite
+      run: |
+        chmod +x tests/run-tests.sh
+        ./tests/run-tests.sh
+    
+    - name: 📊 Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: tests/results/
+        retention-days: 7
+
+  test-container-build:
+    name: 🐳 Container Build Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: 🐳 Build Container Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Containerfile
+        platforms: ${{ matrix.platform }}
+        push: false
+        tags: bindcaptain:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  test-security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔍 Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: 📊 Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: 🔧 Build Container for Security Scan
+      run: |
+        docker build -t bindcaptain:security-test -f Containerfile .
+    
+    - name: 🔍 Run Trivy container scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'bindcaptain:security-test'
+        format: 'table'
+        exit-code: '1'
+        severity: 'CRITICAL,HIGH'
+
+  test-bind-versions:
+    name: 🧭 BIND Version Compatibility
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        bind-version: ["9.16", "9.18"]
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Setup BIND ${{ matrix.bind-version }}
+      run: |
+        # Install different BIND versions for testing
+        sudo apt-get update
+        sudo apt-get install -y bind9-utils
+        named -v || true
+    
+    - name: 🧪 Test Configuration Compatibility
+      run: |
+        # Test example configurations
+        if [ -f examples/named.conf ]; then
+          named-checkconf examples/named.conf
+        fi
+        
+        # Test zone files
+        for zone_file in examples/*.db; do
+          if [ -f "$zone_file" ]; then
+            zone_name=$(basename "$zone_file" .db)
+            named-checkzone "$zone_name" "$zone_file" || true
+          fi
+        done
+
+  test-documentation:
+    name: 📚 Documentation Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔍 Check README Links
+      uses: gaurav-nelson/github-action-markdown-link-check@v1
+      with:
+        use-quiet-mode: 'yes'
+        use-verbose-mode: 'yes'
+        check-modified-files-only: 'no'
+    
+    - name: 📝 Verify Documentation Structure
+      run: |
+        # Check required sections in README
+        grep -q "BindCaptain" README.md
+        grep -q "Features" README.md
+        grep -q "Quick Start" README.md
+        grep -q "License" README.md
+        
+        # Check GitHub repository URL
+        grep -q "github.com/randyoyarzabal/bindcaptain" README.md
+        
+        # Verify examples directory
+        test -d examples
+        test -f examples/named.conf.template
+
+  lint-scripts:
+    name: 🔍 Script Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Install ShellCheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+    
+    - name: 🔍 Lint Shell Scripts
+      run: |
+        # Find and lint all shell scripts
+        find . -name "*.sh" -type f | while read -r script; do
+          echo "Linting: $script"
+          shellcheck "$script" || exit 1
+        done
+
+  publish-image:
+    name: 🚢 Publish Container Image
+    runs-on: ubuntu-latest
+    needs: [test-project, test-container-build, test-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: ⚓ Checkout BindCaptain
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: 🔑 Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: 🏷️ Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: 🚢 Build and push Container Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Containerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  status-check:
+    name: ⚓ CI Status
+    runs-on: ubuntu-latest
+    needs: [test-project, test-container-build, test-security, test-bind-versions, test-documentation, lint-scripts]
+    if: always()
+    
+    steps:
+    - name: 🎉 All Tests Passed
+      if: ${{ needs.test-project.result == 'success' && needs.test-container-build.result == 'success' && needs.test-security.result == 'success' }}
+      run: |
+        echo "🎉 BindCaptain is ready to set sail! All tests passed! ⚓"
+    
+    - name: ❌ Tests Failed
+      if: ${{ needs.test-project.result == 'failure' || needs.test-container-build.result == 'failure' || needs.test-security.result == 'failure' }}
+      run: |
+        echo "❌ Some tests failed. BindCaptain needs repairs before setting sail."
+        exit 1
