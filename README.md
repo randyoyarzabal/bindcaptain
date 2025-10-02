@@ -1,10 +1,10 @@
-# BindCaptain 🌊⚓
+# BindCaptain
 
 > **Containerized BIND DNS Server with Smart Management**
 
 Modern, containerized BIND DNS solution with automated management and inline reverse DNS generation, perfect for homelab and enterprise environments.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone & Configure
 ```bash
@@ -32,7 +32,7 @@ dig @your-server-ip yourdomain.com
 sudo bash -c "source ./bindcaptain_manager.sh && bind.create_record webserver yourdomain.com 192.168.1.100"
 ```
 
-## 📝 DNS Management
+## DNS Management
 
 ```bash
     # Source the manager
@@ -50,7 +50,7 @@ bind.list_records yourdomain.com
 bind.git_refresh
 ```
 
-## 🛠️ Management Commands
+## Management Commands
 
 BindCaptain provides several management commands for DNS operations:
 
@@ -74,17 +74,17 @@ bind.list_records [domain] [type]               # List records
 bind.git_refresh [--force]                      # Update codebase from GitHub
 ```
 
-## ✨ Features
+## Features
 
-- **🐳 Containerized** - Clean, isolated BIND installation
-- **🔄 Auto-Updates** - Built-in git refresh functionality  
-- **📊 Smart Management** - CLI tools for DNS record management
-- **🔒 Secure** - Modern BIND 9.16+ with security best practices
-- **🔧 Zero-Config** - Works out of the box with example configs
-- **📈 Auto-Reverse** - Automatic reverse DNS generation
-- **🎯 Production-Ready** - Used in real production environments
+- **Containerized** - Clean, isolated BIND installation
+- **Auto-Updates** - Built-in git refresh functionality  
+- **Smart Management** - CLI tools for DNS record management
+- **Secure** - Modern BIND 9.16+ with security best practices
+- **Zero-Config** - Works out of the box with example configs
+- **Auto-Reverse** - Automatic reverse DNS generation
+- **Production-Ready** - Used in real production environments
 
-## 📚 Documentation
+## Documentation
 
 Detailed guides available in [`docs/`](docs/):
 
@@ -92,7 +92,7 @@ Detailed guides available in [`docs/`](docs/):
 - **[docs/setup-system.md](docs/setup-system.md)** - System prerequisites  
 - **[docs/example-add-record.md](docs/example-add-record.md)** - Step-by-step examples
 
-## 🌐 Architecture
+## Architecture
 
 ```
 BindCaptain/
@@ -106,12 +106,12 @@ BindCaptain/
 └── docs/                   # Documentation
 ```
 
-## 🛠️ Requirements
+## Requirements
 
 - **Podman** (container runtime)
 - **Git** (for cloning repository)
 
-### 🔧 First-Time Container Setup (Optional)
+### First-Time Container Setup (Optional)
 
 If you need to install Podman and container tools:
 
@@ -122,14 +122,14 @@ If you need to install Podman and container tools:
 
 See [docs/setup-system.md](docs/setup-system.md) for detailed system setup.
 
-## 🤝 Contributing
+## Contributing
 
 Issues and pull requests welcome! See our [GitHub repository](https://github.com/randyoyarzabal/bindcaptain).
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**BindCaptain** - *Navigate your DNS with confidence* 🌊⚓
+**BindCaptain** - *Navigate your DNS with confidence*

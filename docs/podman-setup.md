@@ -6,7 +6,7 @@ This guide focuses specifically on Podman configuration for DNS services that re
 
 ---
 
-## 🎯 Why Root for DNS?
+## Why Root for DNS?
 
 ### **Port 53 Requirements:**
 - **Privileged Port:** Port 53 is a privileged port (< 1024) on Linux
@@ -22,7 +22,7 @@ This guide focuses specifically on Podman configuration for DNS services that re
 
 ---
 
-## 🚀 Rocky Linux 9 Podman Setup
+## Rocky Linux 9 Podman Setup
 
 ### **1. Install Podman Packages**
 
@@ -164,7 +164,7 @@ sudo firewall-cmd --list-ports
 
 ---
 
-## 🧪 Testing Podman DNS Configuration
+## Testing Podman DNS Configuration
 
 ### **1. Basic Podman Tests**
 
@@ -209,7 +209,7 @@ sudo podman run --rm --privileged \
 
 ---
 
-## 🔧 Performance Optimization
+## Performance Optimization
 
 ### **1. Storage Optimization**
 
@@ -258,7 +258,7 @@ sudo sysctl -p /etc/sysctl.d/podman-dns.conf
 
 ---
 
-## 🚨 Common Issues & Solutions
+## Common Issues & Solutions
 
 ### **Port 53 Permission Denied**
 
@@ -319,7 +319,7 @@ sudo podman run --rm alpine:latest ping -c 3 8.8.8.8
 
 ---
 
-## 📋 Production Checklist
+## Production Checklist
 
 ### **Pre-Production Verification:**
 
@@ -345,7 +345,7 @@ sudo podman run --rm alpine:latest ping -c 3 8.8.8.8
 
 ---
 
-## 🎯 Rocky Linux 9 Specific Notes
+## Rocky Linux 9 Specific Notes
 
 ### **Default Configurations:**
 - **Cgroups v2:** Enabled by default (good for containers)

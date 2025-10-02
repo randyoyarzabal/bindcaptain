@@ -1,6 +1,6 @@
 # BindCaptain Management Cheat Sheet
 
-## 🚀 Quick Reference for Your Production BindCaptain Setup
+## Quick Reference for Your Production BindCaptain Setup
 
 **Production Directory:** `/opt/bindcaptain`  
 **Container Name:** `bindcaptain`  
@@ -8,7 +8,7 @@
 
 ---
 
-## 📁 Directory Layout
+## Directory Layout
 ```
 /opt/bindcaptain/
 ├── config/                          # ← YOUR DNS CONFIGS (mounted in container)
@@ -28,7 +28,7 @@
 
 ---
 
-## 🔧 Container Management
+## Container Management
 
 ### Basic Operations
 ```bash
@@ -67,7 +67,7 @@ sudo ./bindcaptain.sh build
 
 ---
 
-## 📝 Managing DNS Records (Using BindCaptain Manager)
+## Managing DNS Records (Using BindCaptain Manager)
 
 **⚠️ IMPORTANT:** Always use the BindCaptain manager functions - never edit zone files manually!
 
@@ -170,7 +170,7 @@ www                IN      CNAME   hostname
 
 ---
 
-## 🔄 Configuration Updates
+## Configuration Updates
 
 ### Modify BIND Configuration
 ```bash
@@ -213,7 +213,7 @@ sudo podman restart bindcaptain
 
 ---
 
-## 🔍 Validation & Testing
+## Validation & Testing
 
 ### Validate Before Changes
 ```bash
@@ -246,7 +246,7 @@ dig @172.25.50.156 homelab.io NS
 
 ---
 
-## 📊 Monitoring & Logs
+## Monitoring & Logs
 
 ### View Logs
 ```bash
@@ -277,7 +277,7 @@ sudo podman exec bindcaptain tail -f /var/log/named/named.log
 
 ---
 
-## 🔧 Automation & Maintenance
+## Automation & Maintenance
 
 ### Reverse DNS Automation
 **Note**: As of BindCaptain v2.1+, PTR records are created automatically when A records are added. No cron jobs or external tools required.
@@ -303,7 +303,7 @@ sudo cp /opt/bindcaptain/config/example.com/example.com.db \
 
 ---
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -367,7 +367,7 @@ sudo podman start bindcaptain
 
 ---
 
-## 📋 Quick Commands Summary
+## Quick Commands Summary
 
 | Task | Command |
 |------|---------|
@@ -382,7 +382,7 @@ sudo podman start bindcaptain
 
 ---
 
-## 🎯 Pro Tips
+## Pro Tips
 
 1. **Always increment serial numbers** after zone changes
 2. **Validate before restarting** - use `named-checkzone` and `named-checkconf`  

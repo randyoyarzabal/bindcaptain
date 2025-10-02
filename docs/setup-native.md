@@ -8,7 +8,7 @@ If you prefer the traditional approach of installing BIND directly on your Rocky
 
 ---
 
-## 🎯 When to Choose Native BIND
+## When to Choose Native BIND
 
 ### **✅ Native BIND is good for:**
 - **Traditional environments** with existing BIND expertise
@@ -26,7 +26,7 @@ If you prefer the traditional approach of installing BIND directly on your Rocky
 
 ---
 
-## 🚀 Rocky Linux 9 Native BIND Installation
+## Rocky Linux 9 Native BIND Installation
 
 ### **1. Install BIND Packages**
 
@@ -98,7 +98,7 @@ sudo rndc reload
 
 ---
 
-## 🔧 Comparison: Native vs Containerized
+## Comparison: Native vs Containerized
 
 | Feature | Native BIND | Containerized BindCaptain |
 |---------|-------------|---------------------------|
@@ -116,7 +116,7 @@ sudo rndc reload
 
 ---
 
-## 📋 Migration Path
+## Migration Path
 
 ### **From Native to Containerized:**
 
@@ -164,7 +164,7 @@ sudo systemctl enable --now named
 
 ---
 
-## 🆘 When to Contact Support
+## When to Contact Support
 
 ### **Native BIND Support:**
 - **Rocky Linux Documentation**: https://docs.rockylinux.org/
@@ -177,7 +177,7 @@ sudo systemctl enable --now named
 
 ---
 
-## 💡 Recommendation
+## Recommendation
 
 For **new deployments**, we recommend the **containerized BindCaptain approach** because:
 

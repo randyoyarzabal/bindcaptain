@@ -1,6 +1,6 @@
 # Example: Adding a New DNS Record
 
-## 📝 Scenario: Add `newserver.example.com` → `192.168.1.200`
+## Scenario: Add `newserver.example.com` → `192.168.1.200`
 
 ### ⚡ **Using BindCaptain Manager (Recommended)**
 
@@ -48,7 +48,7 @@ dig @192.168.1.1 -x 192.168.1.200 +short
 sudo tail /opt/bindcaptain/logs/dns_refresh.log
 ```
 
-## 🎯 That's it! 
+## That's it! 
 
 ✅ **Serial number automatically incremented**  
 ✅ **Zone validated before applying**  
@@ -59,7 +59,7 @@ sudo tail /opt/bindcaptain/logs/dns_refresh.log
 
 ---
 
-## 🔄 Adding a CNAME Record
+## Adding a CNAME Record
 
 If you want `web.example.com` to point to `newserver.example.com`:
 

@@ -8,7 +8,7 @@ This guide walks you through setting up a clean Linux system (Rocky Linux 9, Alm
 
 ---
 
-## 🎯 Target Systems & Approach
+## Target Systems & Approach
 
 ### **📦 Container vs. Native BIND:**
 
@@ -33,7 +33,7 @@ This guide walks you through setting up a clean Linux system (Rocky Linux 9, Alm
 
 ---
 
-## 🚀 Quick Start Commands
+## Quick Start Commands
 
 ### **🐳 For Containerized BindCaptain (This Guide):**
 ```bash
@@ -55,7 +55,7 @@ sudo systemctl enable --now named
 
 ---
 
-## 📋 Container Setup Steps
+## Container Setup Steps
 
 ### **1. System Preparation**
 
@@ -278,7 +278,7 @@ sudo ./bindcaptain.sh validate
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### **Common Issues:**
 
@@ -333,7 +333,7 @@ systemctl status systemd-resolved
 
 ---
 
-## 📋 Production Checklist
+## Production Checklist
 
 ### **Container-Ready Verification:**
 
@@ -348,7 +348,7 @@ systemctl status systemd-resolved
 
 ---
 
-## 🎯 Next Steps
+## Next Steps
 
 After completing this system setup:
 
@@ -360,7 +360,7 @@ After completing this system setup:
 
 ---
 
-## 🆘 Support
+## Support
 
 ### **System-Level Support:**
 - **Rocky Linux**: https://docs.rockylinux.org/
