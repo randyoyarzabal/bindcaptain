@@ -83,9 +83,9 @@ setup_user_config() {
     mkdir -p user-config
     
     # Copy template files
-    cp examples/named.conf.template user-config/named.conf
-    cp examples/example.com.db user-config/
-    cp examples/reverse.in-addr.arpa.db user-config/
+    cp config-examples/named.conf.template user-config/named.conf
+    cp config-examples/example.com.db user-config/
+    cp config-examples/reverse.in-addr.arpa.db user-config/
     
     print_status "success" "User configuration template created"
     
@@ -136,19 +136,19 @@ interactive_config() {
         -e "s/YOUR_SECONDARY_DNS_1/${secondary_dns1:-127.0.0.1}/g" \
         -e "s/YOUR_SECONDARY_DNS_2/${secondary_dns2:-127.0.0.1}/g" \
         -e "s/YOUR_REVERSE_ZONE/$(echo $network_range | cut -d'.' -f1-2 | sed 's/\./ /g' | awk '{print $2"."$1}')/g" \
-        examples/named.conf.template > user-config/named.conf
+        config-examples/named.conf.template > user-config/named.conf
     
     # Create customized zone file
     sed -e "s/example\.com/$domain_name/g" \
         -e "s/172\.25\.50\.156/$dns_ip/g" \
-        examples/example.com.db > "user-config/${domain_name}.db"
+        config-examples/example.com.db > "user-config/${domain_name}.db"
     
     # Create reverse zone file
     local reverse_zone="$(echo $network_range | cut -d'.' -f1-2 | sed 's/\./ /g' | awk '{print $2"."$1}').in-addr.arpa"
     sed -e "s/example\.com/$domain_name/g" \
         -e "s/25\.172/$reverse_zone/g" \
         -e "s/172\.25\.50\.156/$dns_ip/g" \
-        examples/reverse.in-addr.arpa.db > "user-config/${reverse_zone}.db"
+        config-examples/reverse.in-addr.arpa.db > "user-config/${reverse_zone}.db"
     
     print_status "success" "Customized configuration created"
     
