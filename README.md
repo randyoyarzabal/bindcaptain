@@ -62,6 +62,8 @@ sudo ./bindcaptain.sh enable
 sudo ./bindcaptain.sh start|stop|restart|service-status
 ```
 
+> **📖 Detailed service setup?** See [Systemd Service Guide](docs/systemd-service.md) for complete service management instructions.
+
 ### DNS Record Management
 ```bash
 # Source the manager
@@ -76,6 +78,8 @@ bind.create_txt @ yourdomain.com "v=spf1 -all"
 bind.list_records yourdomain.com
 ```
 
+> **📖 Advanced DNS operations?** See [DNS Operations Guide](docs/dns-operations.md) for comprehensive record management and zone configuration.
+
 ## 📚 Key Commands
 
 ```bash
@@ -88,6 +92,8 @@ sudo ./bindcaptain.sh install|uninstall|enable|disable|start|stop-service
 # DNS Management
 bind.create_record|create_cname|create_txt|delete_record|list_records
 ```
+
+> **📖 Complete command reference?** See [Cheat Sheet](docs/cheat-sheet.md) for all available commands and examples.
 
 ## ✨ Features
 
