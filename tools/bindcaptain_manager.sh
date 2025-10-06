@@ -3,101 +3,80 @@
 # ⚓ BindCaptain DNS Manager
 # Container-aware DNS management for modern BIND infrastructure
 # Take command of your DNS records with confidence
+#
+# USAGE:
+#   # As a library (recommended for interactive use)
+#   source ./tools/bindcaptain_manager.sh
+#   bind.create_record webserver example.com 192.168.1.100
+#
+#   # As a direct command
+#   sudo ./tools/bindcaptain_manager.sh refresh
+#
+# FUNCTIONS:
+#   bind.create_record    - Create DNS A record
+#   bind.create_cname     - Create DNS CNAME record
+#   bind.create_txt       - Create DNS TXT record
+#   bind.delete_record    - Delete DNS record
+#   bind.list_records     - List DNS records
+#   bind.git_refresh      - Update codebase from GitHub
+#   refresh               - Refresh and validate DNS configuration
+#   show_environment      - Show environment information
+#
+# EXAMPLES:
+#   # Create A record
+#   bind.create_record webserver example.com 192.168.1.100
+#
+#   # Create CNAME record
+#   bind.create_cname www example.com webserver
+#
+#   # Create TXT record
+#   bind.create_txt @ example.com "v=spf1 -all"
+#
+#   # List all records
+#   bind.list_records
+#
+#   # Refresh DNS configuration
+#   ./tools/bindcaptain_manager.sh refresh
+#
+# FEATURES:
+#   - Container-aware (works inside and outside containers)
+#   - Automatic PTR record creation for A records
+#   - Zone file validation and backup
+#   - Interactive record management
+#   - BIND reload and validation
+#   - Comprehensive logging
+#
+# REQUIREMENTS:
+#   - Root privileges (sudo)
+#   - BindCaptain container running (for some operations)
+#   - Valid DNS configuration
 
-# Container configuration
-CONTAINER_NAME="bindcaptain"
-CONTAINER_DATA_DIR="/opt/bindcaptain"
-DOMAIN_CONFIG_BASE="/var/named"
+set -e
 
-# Use container paths if running in container, host paths if running on host
-if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
-    # Running inside container
-    BIND_DIR="/var/named"
-    NAMED_CONF="/etc/named.conf"
-    LOG_FILE="/var/log/bind_manager.log"
-    BACKUP_DIR="/var/backups/bind"
-else
-    # Running on host - target the same config the container uses
-    BIND_DIR="$CONTAINER_DATA_DIR/config"
-    NAMED_CONF="$CONTAINER_DATA_DIR/config/named.conf"
-    LOG_FILE="$CONTAINER_DATA_DIR/logs/bind_manager.log"
-    BACKUP_DIR="$CONTAINER_DATA_DIR/backups"
-fi
+# Load common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
 
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-WHITE='\033[1;37m'
-NC='\033[0m' # No Color
+# Manager-specific configuration
+LOG_FILE="$LOG_DIR/bind_manager.log"
+BACKUP_DIR="$CONTAINER_DATA_DIR/backups"
 
-# Icons
-CHECK="✓"
-CROSS="✗"
-
-# Auto-discover domains from named.conf
-discover_domains() {
-    local domains=()
-    if [ -f "$NAMED_CONF" ]; then
-        while IFS= read -r line; do
-            if echo "$line" | grep -q '^[[:space:]]*zone[[:space:]]\+'; then
-                local zone_name=$(echo "$line" | sed 's/.*zone[[:space:]]*"\([^"]*\)".*/\1/')
-                # Skip special zones
-                if [[ ! "$zone_name" =~ ^(\.|\.|localhost|.*\.arpa)$ ]]; then
-                    domains+=("$zone_name")
-                fi
-            fi
-        done < "$NAMED_CONF"
-    fi
-    printf '%s\n' "${domains[@]}"
-}
-
+# Manager-specific variables
 DOMAINS=($(discover_domains))
 DEFAULT_TTL="86400"
 
-# Logging function
+# Manager-specific logging function
 log_action() {
-    mkdir -p "$(dirname "$LOG_FILE")"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+    log_message "$1" "$LOG_FILE"
 }
 
-# Print colored output
-print_status() {
-    local status=$1
-    local message=$2
-    if [ "$status" = "success" ]; then
-        echo -e "${GREEN}${CHECK}${NC} $message"
-    elif [ "$status" = "error" ]; then
-        echo -e "${RED}${CROSS}${NC} $message"
-    elif [ "$status" = "warning" ]; then
-        echo -e "${YELLOW}${CROSS}${NC} $message"
-    elif [ "$status" = "info" ]; then
-        echo -e "${BLUE}${CHECK}${NC} $message"
-    fi
+# Custom header for this script
+print_manager_header() {
+    print_header "BIND DNS Management Tool" "(Container-aware)"
 }
 
-# Header function
-print_header() {
-    echo -e "${CYAN}================================${NC}"
-    echo -e "${CYAN}  BIND DNS Management Tool${NC}"
-    echo -e "${CYAN}  (Container-aware)${NC}"
-    echo -e "${CYAN}================================${NC}"
-    echo
-}
-
-# Check if running as root
-check_root() {
-    if [ "$EUID" -ne 0 ]; then
-        print_status "error" "This script must be run as root (use sudo)"
-        exit 1
-    fi
-}
-
-# Validate domain
-validate_domain() {
+# Manager-specific domain validation (checks against discovered domains)
+validate_domain_in_config() {
     local domain=$1
     for valid_domain in "${DOMAINS[@]}"; do
         if [ "$domain" = "$valid_domain" ]; then
@@ -105,32 +84,6 @@ validate_domain() {
         fi
     done
     return 1
-}
-
-# Validate hostname
-validate_hostname() {
-    local hostname=$1
-    if [[ $hostname =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Validate IP address
-validate_ip() {
-    local ip=$1
-    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        IFS='.' read -ra ADDR <<< "$ip"
-        for i in "${ADDR[@]}"; do
-            if [ "$i" -gt 255 ]; then
-                return 1
-            fi
-        done
-        return 0
-    else
-        return 1
-    fi
 }
 
 # Backup zone file
@@ -359,7 +312,7 @@ bind.create_record() {
     local ip_address=$3
     local ttl=${4:-$DEFAULT_TTL}
     
-    print_header
+    print_manager_header
     echo -e "${WHITE}Creating A Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Hostname: $hostname"
@@ -374,7 +327,7 @@ bind.create_record() {
         return 1
     fi
     
-    if ! validate_domain "$domain"; then
+    if ! validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -484,7 +437,7 @@ bind.create_cname() {
     local domain=$2
     local target=$3
     
-    print_header
+    print_manager_header
     echo -e "${WHITE}Creating CNAME Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Alias: $alias"
@@ -498,7 +451,7 @@ bind.create_cname() {
         return 1
     fi
     
-    if ! validate_domain "$domain"; then
+    if ! validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -599,7 +552,7 @@ bind.create_txt() {
     local domain=$2
     local text_value="$3"
     
-    print_header
+    print_manager_header
     echo -e "${WHITE}Creating TXT Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Name: $name"
@@ -613,7 +566,7 @@ bind.create_txt() {
         return 1
     fi
     
-    if ! validate_domain "$domain"; then
+    if ! validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -694,7 +647,7 @@ bind.delete_record() {
     local domain=$2
     local record_type=${3:-""}
     
-    print_header
+    print_manager_header
     echo -e "${WHITE}Deleting DNS Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Name: $name"
@@ -708,7 +661,7 @@ bind.delete_record() {
         return 1
     fi
     
-    if ! validate_domain "$domain"; then
+    if ! validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -808,12 +761,12 @@ bind.list_records() {
     local domain=${1:-""}
     local record_type=${2:-""}
     
-    print_header
+    print_manager_header
     echo -e "${WHITE}DNS Records${NC}"
     echo
     
     if [ -n "$domain" ]; then
-        if ! validate_domain "$domain"; then
+        if ! validate_domain_in_config "$domain"; then
             print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
             return 1
         fi
@@ -941,7 +894,7 @@ bind.git_refresh() {
 
 # Show environment info
 show_environment() {
-    print_header
+    print_manager_header
     echo -e "${WHITE}Environment Information${NC}"
     echo
     echo "Mode: $(if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then echo "Container"; else echo "Host"; fi)"
@@ -990,8 +943,11 @@ main() {
             show_environment)
                 show_environment "$@"
                 ;;
+            refresh)
+                refresh_dns "$@"
+                ;;
         *)
-            print_header
+            print_manager_header
             echo -e "${WHITE}Available Commands:${NC}"
             echo
                 echo -e "  ${GREEN}bind.create_record${NC}  - Create DNS A record"
@@ -1000,6 +956,7 @@ main() {
                 echo -e "  ${GREEN}bind.delete_record${NC}  - Delete DNS record"
                 echo -e "  ${GREEN}bind.list_records${NC}   - List DNS records"
                 echo -e "  ${GREEN}bind.git_refresh${NC}    - Update codebase from GitHub"
+                echo -e "  ${GREEN}refresh${NC}             - Refresh and validate DNS configuration"
                 echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
             echo
             echo -e "${YELLOW}Usage:${NC}"
@@ -1017,7 +974,110 @@ main() {
     esac
 }
 
-# Only run main if script is executed directly
+# DNS Refresh and Maintenance Functions
+refresh_dns() {
+    print_manager_header
+    log_action "Starting DNS refresh process (container-aware)"
+    
+    # Ensure proper ownership of zone files
+    log_action "Ensuring proper ownership of zone files in $BIND_DIR"
+    if [ -d "$BIND_DIR" ]; then
+        if is_container; then
+            # Running inside container
+            chown named:named "$BIND_DIR"/*.db 2>/dev/null || true
+            chmod 644 "$BIND_DIR"/*.db 2>/dev/null || true
+        else
+            # Running on host
+            chown 25:25 "$BIND_DIR"/*.db 2>/dev/null || true
+            chmod 644 "$BIND_DIR"/*.db 2>/dev/null || true
+        fi
+    fi
+    
+    # Check configuration and zones
+    if validate_bind_config && check_zones; then
+        log_action "Configuration and zone validation passed"
+        print_status "success" "DNS refresh completed successfully"
+    else
+        log_action "ERROR: Configuration or zone validation failed"
+        print_status "error" "DNS refresh failed - check configuration"
+        return 1
+    fi
+    
+    log_action "DNS refresh process completed"
+}
+
+# Check individual zone files
+check_zones() {
+    local errors=0
+    local zones=($(discover_domains))
+    
+    for zone in "${zones[@]}"; do
+        # Find zone file in domain-specific subdirectories
+        local zone_file=""
+        if [ -f "$BIND_DIR/${zone}/${zone}.db" ]; then
+            zone_file="$BIND_DIR/${zone}/${zone}.db"
+        elif [ -f "$BIND_DIR/${zone}.db" ]; then
+            zone_file="$BIND_DIR/${zone}.db"
+        fi
+        
+        if [ -z "$zone_file" ]; then
+            log_action "WARNING: Zone file for $zone not found"
+            continue
+        fi
+        
+        if is_container; then
+            # Running inside container
+            if named-checkzone "$zone" "$zone_file" >/dev/null 2>&1; then
+                log_action "Zone $zone is valid"
+            else
+                log_action "ERROR: Zone $zone has errors"
+                ((errors++))
+            fi
+        else
+            # Running on host - check via container
+            if is_container_running; then
+                # Convert host path to container path
+                local container_zone_file=$(echo "$zone_file" | sed "s|$BIND_DIR|/var/named|")
+                if podman exec "$CONTAINER_NAME" named-checkzone "$zone" "$container_zone_file" >/dev/null 2>&1; then
+                    log_action "Zone $zone is valid"
+                else
+                    log_action "ERROR: Zone $zone has errors"
+                    ((errors++))
+                fi
+            else
+                log_action "Cannot validate zone $zone - container not running"
+            fi
+        fi
+    done
+    
+    return $errors
+}
+
+# Direct command line interface
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-    main "$@"
+    case "${1:-help}" in
+        "refresh")
+            refresh_dns
+            ;;
+        "help"|"-h"|"--help")
+            print_manager_header
+            echo "BindCaptain DNS Manager - Direct Commands"
+            echo
+            echo "Usage: $0 [COMMAND]"
+            echo
+            echo "Commands:"
+            echo "  refresh  - Refresh and validate DNS configuration"
+            echo "  help     - Show this help"
+            echo
+            echo "For interactive DNS management, source this script:"
+            echo "  source $0"
+            echo "  bind.create_record --help"
+            ;;
+        *)
+            print_manager_header
+            echo "Unknown command: $1"
+            echo "Use '$0 help' for available commands"
+            exit 1
+            ;;
+    esac
 fi

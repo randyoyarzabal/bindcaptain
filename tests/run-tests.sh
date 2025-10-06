@@ -109,8 +109,7 @@ test_project_structure() {
         "tools/bindcaptain_manager.sh"
         "tools/bindcaptain_refresh.sh"
         "Containerfile"
-        "tools/container_start.sh"
-        "tools/setup.sh"
+        "tools/config-setup.sh"
         "README.md"
         "LICENSE"
     )
@@ -146,8 +145,7 @@ test_script_syntax() {
         "bindcaptain.sh"
         "tools/bindcaptain_manager.sh"
         "tools/bindcaptain_refresh.sh"
-        "tools/container_start.sh"
-        "tools/setup.sh"
+        "tools/config-setup.sh"
     )
     
     for script in "${scripts[@]}"; do

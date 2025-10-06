@@ -100,5 +100,4 @@ WORKDIR /var/named
 USER root
 
 # Start BIND
-ENTRYPOINT ["/usr/local/bin/container_start.sh"]
 CMD ["named", "-g", "-u", "named"]

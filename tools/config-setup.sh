@@ -1,38 +1,49 @@
 #!/bin/bash
 
-# Setup script for BIND DNS Container
-# Helps users get started quickly with their own configuration
+# ⚓ BindCaptain Configuration Setup Script
+# Helps users get started quickly with their own DNS configuration
+#
+# USAGE:
+#   sudo ./tools/config-setup.sh [COMMAND]
+#
+# COMMANDS:
+#   wizard  - Interactive configuration wizard (recommended)
+#   setup   - Copy templates to user-config/ directory
+#   check   - Check prerequisites
+#   help    - Show this help
+#
+# WHAT IT DOES:
+#   - Checks prerequisites (Podman, root access)
+#   - Creates user-config/ directory with DNS templates
+#   - Interactive wizard for customized configuration
+#   - Generates named.conf and zone files from templates
+#   - Sets up proper file permissions
+#
+# EXAMPLES:
+#   # Interactive setup (recommended)
+#   sudo ./tools/config-setup.sh wizard
+#
+#   # Manual setup
+#   sudo ./tools/config-setup.sh setup
+#   # Edit files in user-config/ directory
+#
+#   # Check if ready
+#   sudo ./tools/config-setup.sh check
+#
+# REQUIREMENTS:
+#   - Root privileges (sudo)
+#   - Podman installed (use system-setup.sh first)
+#   - config-examples/ directory present
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Load common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
 
-# Icons
-CHECK="✓"
-CROSS="✗"
-
-print_status() {
-    local status=$1
-    local message=$2
-    case $status in
-        "success") echo -e "${GREEN}${CHECK}${NC} $message" ;;
-        "error") echo -e "${RED}${CROSS}${NC} $message" ;;
-        "warning") echo -e "${YELLOW}${CROSS}${NC} $message" ;;
-        "info") echo -e "${BLUE}${CHECK}${NC} $message" ;;
-    esac
-}
-
-print_header() {
-    echo -e "${CYAN}============================================${NC}"
-    echo -e "${CYAN}  BindCaptain Setup${NC}"
-    echo -e "${CYAN}============================================${NC}"
-    echo
+# Custom header for this script
+print_setup_header() {
+    print_header "BindCaptain Setup"
 }
 
 # Check prerequisites
@@ -163,7 +174,7 @@ interactive_config() {
 
 # Show usage
 show_help() {
-    print_header
+    print_setup_header
     echo "BindCaptain Setup - Navigate DNS complexity with captain-grade precision"
     echo
     echo "Usage: $0 [COMMAND]"
@@ -187,19 +198,19 @@ main() {
     
     case $command in
         "setup")
-            print_header
+            print_setup_header
             check_prerequisites
             setup_user_config
             ;;
             
         "wizard")
-            print_header
+            print_setup_header
             check_prerequisites
             interactive_config
             ;;
             
         "check")
-            print_header
+            print_setup_header
             check_prerequisites
             print_status "success" "System is ready for BIND DNS container"
             ;;

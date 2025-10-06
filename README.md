@@ -4,26 +4,88 @@
 
 Modern, containerized BIND DNS solution with automated management and inline reverse DNS generation, perfect for homelab and enterprise environments.
 
+## System Requirements
+
+### Supported Distributions
+BindCaptain includes an automated system setup script for the following distributions:
+
+- **RHEL 8+** (Red Hat Enterprise Linux)
+- **CentOS 8+** (CentOS Stream)
+- **Rocky Linux 8+**
+- **AlmaLinux 8+**
+- **Fedora 30+**
+
+### Manual Setup for Other Distributions
+If you're using an unsupported distribution (Ubuntu, Debian, Arch, etc.), you'll need to manually install the prerequisites before running BindCaptain:
+
+#### Required Packages
+```bash
+# Install container runtime (Podman recommended)
+# Ubuntu/Debian:
+sudo apt update
+sudo apt install podman podman-compose buildah skopeo
+
+# Arch Linux:
+sudo pacman -S podman podman-compose buildah skopeo
+
+# Other distributions: Install Podman from your package manager
+```
+
+#### Required Tools
+- **Podman** (container runtime)
+- **Git** (for cloning repository)
+- **bind-utils** (for DNS testing with `dig`, `nslookup`)
+
+#### System Configuration
+- **Port 53** must be available (stop any existing DNS services)
+- **Root privileges** required for container operations
+- **Firewall** configured to allow ports 53/tcp and 53/udp
+
 ## Quick Start
 
-### 1. Clone & Configure
+### 1. System Setup (First Time)
+
+#### For Supported Distributions (RHEL/CentOS/Rocky/AlmaLinux/Fedora)
 ```bash
 git clone https://github.com/randyoyarzabal/bindcaptain.git
 cd bindcaptain
 
-# Add your DNS zones
+# Automated system setup (installs Podman, configures system)
+# This script will detect your distribution and install prerequisites
+sudo ./tools/system-setup.sh
+```
+
+> **Note**: The automated setup script will check your distribution and provide helpful error messages if you're on an unsupported system.
+
+#### For Other Distributions (Ubuntu/Debian/Arch/etc.)
+```bash
+git clone https://github.com/randyoyarzabal/bindcaptain.git
+cd bindcaptain
+
+# Manual setup required - see detailed instructions below
+# Install Podman, bind-utils, and configure system manually
+```
+
+**📖 Detailed Manual Setup Guide**: See [Manual Setup Guide](docs/manual-setup.md) for step-by-step instructions for Ubuntu, Debian, Arch Linux, and other distributions.
+
+### 2. Configure DNS Zones
+```bash
+# Interactive configuration wizard
+sudo ./tools/config-setup.sh wizard
+
+# Or manual setup
 mkdir -p config/yourdomain.com
 # Copy your zone files to config/yourdomain.com/
 # Copy config-examples/named.conf.template to config/named.conf and customize
 ```
 
-### 2. Launch Container
+### 3. Launch Container
 ```bash
 sudo ./bindcaptain.sh build
 sudo ./bindcaptain.sh run
 ```
 
-### 3. Verify & Manage
+### 4. Verify & Manage
 ```bash
 # Test DNS resolution
 dig @your-server-ip yourdomain.com
@@ -140,12 +202,24 @@ bind.git_refresh [--force]                      # Update codebase from GitHub
 
 ## Documentation
 
-Detailed guides available in [`docs/`](docs/):
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
-- **[docs/cheat-sheet.md](docs/cheat-sheet.md)** - Complete management reference
-- **[docs/setup-system.md](docs/setup-system.md)** - System prerequisites  
-- **[docs/example-add-record.md](docs/example-add-record.md)** - Step-by-step examples
-- **[docs/systemd-service.md](docs/systemd-service.md)** - Systemd service setup guide
+### Quick Start
+- **[Installation Guide](docs/installation.md)** - Complete setup and configuration
+- **[Quick Start Guide](docs/quick-start.md)** - Get up and running in minutes
+- **[System Requirements](docs/system-requirements.md)** - Supported distributions and prerequisites
+
+### User Guides
+- **[DNS Operations](docs/dns-operations.md)** - Managing DNS records and zones
+- **[Configuration Management](docs/configuration.md)** - Customizing your DNS setup
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+
+### Reference
+- **[Complete Documentation Index](docs/index.md)** - Full table of contents and navigation
+- **[Cheat Sheet](docs/cheat-sheet.md)** - Quick command reference
+- **[Systemd Service](docs/systemd-service.md)** - Service management guide
+
+**📚 [View All Documentation](docs/index.md)**
 
 ## Architecture
 
@@ -167,8 +241,8 @@ BindCaptain/
 If you need to install Podman and container tools:
 
 ```bash
-# Rocky Linux 9 / CentOS Stream 9 / AlmaLinux 9
-    sudo ./tools/setup.sh  # Installs Podman, git, bind-utils
+# RHEL/CentOS/Rocky/AlmaLinux/Fedora
+    sudo ./tools/system-setup.sh  # Installs Podman, git, bind-utils
 ```
 
 See [docs/setup-system.md](docs/setup-system.md) for detailed system setup.

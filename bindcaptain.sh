@@ -5,66 +5,21 @@
 
 set -e
 
+# Load common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/tools/common.sh"
+
 # Configuration
-CONTAINER_NAME="bindcaptain"
 IMAGE_NAME="bindcaptain"
 IMAGE_TAG="latest"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default paths (can be overridden by user)
 BINDCAPTAIN_CONFIG_PATH="${BINDCAPTAIN_CONFIG_PATH:-$SCRIPT_DIR/config}"
 # Direct mount from bindcaptain directory - no staging needed
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-# Icons
-CHECK="✓"
-CROSS="✗"
-
-# Print colored status
-print_status() {
-    local status=$1
-    local message=$2
-    case $status in
-        "success") echo -e "${GREEN}${CHECK}${NC} $message" ;;
-        "error") echo -e "${RED}${CROSS}${NC} $message" ;;
-        "warning") echo -e "${YELLOW}${CROSS}${NC} $message" ;;
-        "info") echo -e "${BLUE}${CHECK}${NC} $message" ;;
-    esac
-}
-
-# Print header
-print_header() {
-    echo -e "${CYAN}======================================${NC}"
-    echo -e "${CYAN}  BIND DNS Container${NC}"
-    echo -e "${CYAN}======================================${NC}"
-    echo
-}
-
-# Check if running as root
-check_root() {
-    if [ "$EUID" -ne 0 ]; then
-        print_status "error" "This script must be run as root (use sudo)"
-        echo "  Container needs to bind to port 53 (privileged port)"
-        exit 1
-    fi
-}
-
-# Check if podman is installed
-check_podman() {
-    if ! command -v podman &> /dev/null; then
-        print_status "error" "Podman is not installed"
-        echo "  Install with: dnf install podman"
-        exit 1
-    fi
-    print_status "success" "Podman is available"
+# Custom header for this script
+print_bindcaptain_header() {
+    print_bindcaptain_header "BIND DNS Container"
 }
 
 # Validate user configuration directory
@@ -76,6 +31,7 @@ validate_user_config() {
         echo "  Please create your configuration directory with:"
         echo "  mkdir -p $BINDCAPTAIN_CONFIG_PATH"
         echo "  cp config-examples/* $BINDCAPTAIN_CONFIG_PATH/"
+        echo "  # Or use: sudo ./tools/config-setup.sh wizard"
         echo "  # Edit files in $BINDCAPTAIN_CONFIG_PATH/ for your setup"
         exit 1
     fi
@@ -99,9 +55,8 @@ validate_user_config() {
         exit 1
     fi
     
-    # Validate named.conf
-    if ! named-checkconf "$BINDCAPTAIN_CONFIG_PATH/named.conf"; then
-        print_status "error" "Invalid BIND configuration in $BINDCAPTAIN_CONFIG_PATH/named.conf"
+    # Validate named.conf using common function
+    if ! validate_bind_config "$BINDCAPTAIN_CONFIG_PATH/named.conf"; then
         exit 1
     fi
     
@@ -279,7 +234,7 @@ show_info() {
 # Show help
 # Systemctl service management functions
 install_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     check_podman
     
@@ -339,7 +294,7 @@ install_service() {
 }
 
 uninstall_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     
     print_status "info" "Uninstalling BindCaptain systemd service..."
@@ -358,7 +313,7 @@ uninstall_service() {
 }
 
 enable_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     
     print_status "info" "Enabling BindCaptain service to start at boot..."
@@ -367,7 +322,7 @@ enable_service() {
 }
 
 disable_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     
     print_status "info" "Disabling BindCaptain service from starting at boot..."
@@ -376,7 +331,7 @@ disable_service() {
 }
 
 start_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     
     print_status "info" "Starting BindCaptain service..."
@@ -385,7 +340,7 @@ start_service() {
 }
 
 stop_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     
     print_status "info" "Stopping BindCaptain service..."
@@ -394,7 +349,7 @@ stop_service() {
 }
 
 restart_service() {
-    print_header
+    print_bindcaptain_header
     check_root
     
     print_status "info" "Restarting BindCaptain service..."
@@ -403,14 +358,14 @@ restart_service() {
 }
 
 show_service_status() {
-    print_header
+    print_bindcaptain_header
     print_status "info" "BindCaptain service status:"
     echo
     systemctl status bindcaptain --no-pager
 }
 
 show_help() {
-    print_header
+    print_bindcaptain_header
     echo "BIND DNS Container Management"
     echo
     echo "Usage: $0 [COMMAND] [OPTIONS]"
@@ -442,6 +397,9 @@ show_help() {
     echo "  service-status - Show service status"
     echo
     echo "First Time Setup:"
+    echo "  System Setup:    sudo ./tools/system-setup.sh"
+    echo "  Config Setup:    sudo ./tools/config-setup.sh wizard"
+    echo "  Manual Setup:    See docs/manual-setup.md for other distributions"
     echo "  The script will offer to install the systemd service"
     echo "  when 'run' is executed as root and service is not found."
     echo
@@ -495,14 +453,14 @@ main() {
     
     case $command in
         "build")
-            print_header
+            print_bindcaptain_header
             check_root
             check_podman
             build_container
             ;;
             
         "run")
-            print_header
+            print_bindcaptain_header
             check_root
             check_podman
             validate_user_config
@@ -515,7 +473,7 @@ main() {
             ;;
             
         "stop")
-            print_header
+            print_bindcaptain_header
             check_root
             print_status "info" "Stopping container..."
             if podman stop "$CONTAINER_NAME" 2>/dev/null; then
@@ -526,7 +484,7 @@ main() {
             ;;
             
         "restart")
-            print_header
+            print_bindcaptain_header
             check_root
             print_status "info" "Restarting container..."
             if podman restart "$CONTAINER_NAME" 2>/dev/null; then
@@ -539,26 +497,26 @@ main() {
             ;;
             
         "logs")
-            print_header
+            print_bindcaptain_header
             print_status "info" "Showing container logs (Ctrl+C to exit)..."
             echo
             podman logs -f "$CONTAINER_NAME"
             ;;
             
         "status")
-            print_header
+            print_bindcaptain_header
             check_status
             show_info
             ;;
             
         "shell")
-            print_header
+            print_bindcaptain_header
             print_status "info" "Entering container shell..."
             podman exec -it "$CONTAINER_NAME" /bin/bash
             ;;
             
         "cleanup")
-            print_header
+            print_bindcaptain_header
             check_root
             print_status "warning" "This will remove the container and image"
             read -p "Are you sure? (y/N): " -n 1 -r
@@ -574,7 +532,7 @@ main() {
             ;;
             
         "validate")
-            print_header
+            print_bindcaptain_header
             validate_user_config
             print_status "success" "User configuration is valid"
             ;;
