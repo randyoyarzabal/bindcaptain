@@ -1,0 +1,43 @@
+# GitHub Pages Configuration for BindCaptain
+# Theme: Minimal (GitHub supported theme)
+
+title: BindCaptain Documentation
+description: Containerized BIND DNS Server with Smart Management
+url: https://randyoyarzabal.github.io
+baseurl: /bindcaptain
+
+# Theme configuration
+theme: jekyll-theme-minimal
+
+# Site settings
+logo: /bindcaptain/assets/images/logo.png
+favicon: /bindcaptain/assets/images/favicon.ico
+
+# Navigation
+nav_external_links:
+  - title: GitHub Repository
+    url: https://github.com/randyoyarzabal/bindcaptain
+
+# Footer
+footer_content: "BindCaptain - Navigate your DNS with confidence"
+
+# Aux links for the upper right navigation
+aux_links:
+  "GitHub Repository":
+    - "//github.com/randyoyarzabal/bindcaptain"
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
