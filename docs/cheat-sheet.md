@@ -69,7 +69,7 @@ sudo ./bindcaptain.sh build
 
 ## Managing DNS Records (Using BindCaptain Manager)
 
-**⚠️ IMPORTANT:** Always use the BindCaptain manager functions - never edit zone files manually!
+**⚠ IMPORTANT:** Always use the BindCaptain manager functions - never edit zone files manually!
 
 ### Using the Manager
 ```bash
@@ -139,12 +139,12 @@ sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
     bind.list_records example.com A"
 ```
 
-### ⚡ **Auto-Management Features**
-- **✅ Serial numbers** automatically incremented
-- **✅ Zone validation** before applying changes  
-- **✅ Automatic backups** before modifications
-- **✅ BIND reload** after successful changes
-- **✅ Rollback** on validation failures
+### **Auto-Management Features**
+- **✓ Serial numbers** automatically incremented
+- **✓ Zone validation** before applying changes  
+- **✓ Automatic backups** before modifications
+- **✓ BIND reload** after successful changes
+- **✓ Rollback** on validation failures
 
 ### Zone File Template
 ```dns

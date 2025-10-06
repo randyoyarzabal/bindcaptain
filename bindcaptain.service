@@ -1,0 +1,29 @@
+[Unit]
+Description=BindCaptain DNS Container Service
+Documentation=https://github.com/randyoyarzabal/bindcaptain
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/bindcaptain/bindcaptain.sh run
+ExecStop=/opt/bindcaptain/bindcaptain.sh stop
+ExecReload=/opt/bindcaptain/bindcaptain.sh restart
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Security settings
+User=root
+Group=root
+
+# Environment
+Environment=BINDCAPTAIN_CONFIG_PATH=/opt/bindcaptain/config
+Environment=TZ=UTC
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

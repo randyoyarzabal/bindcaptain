@@ -2,7 +2,7 @@
 
 **Complete guide for preparing a fresh Linux system to run BindCaptain DNS containers**
 
-> **🐳 CONTAINERIZED APPROACH:** This guide is specifically for setting up **containerized DNS infrastructure** using BindCaptain and Podman. This is **NOT** for traditional native BIND package installation.
+> **CONTAINERIZED APPROACH:** This guide is specifically for setting up **containerized DNS infrastructure** using BindCaptain and Podman. This is **NOT** for traditional native BIND package installation.
 
 This guide walks you through setting up a clean Linux system (Rocky Linux 9, AlmaLinux 9, CentOS Stream 9) to run **containerized** BindCaptain DNS infrastructure using Podman.
 
@@ -10,38 +10,41 @@ This guide walks you through setting up a clean Linux system (Rocky Linux 9, Alm
 
 ## Target Systems & Approach
 
-### **📦 Container vs. Native BIND:**
+### **Container vs. Native BIND:**
 
 | Approach | Use Case | This Guide |
 |----------|----------|------------|
-| **🐳 Containerized (BindCaptain)** | Modern, portable, isolated DNS infrastructure | ✅ **This Guide** |
-| **📦 Native BIND packages** | Traditional system-level BIND installation | ❌ Not covered |
+| **Containerized (BindCaptain)** | Modern, portable, isolated DNS infrastructure | ✓ **This Guide** |
+| **Native BIND packages** | Traditional system-level BIND installation | ✗ Not covered |
 
 > **This guide is for containerized BindCaptain only.** For native BIND installation, use your distribution's package manager and follow traditional BIND documentation.
 
 ### **Tested Container-Ready Distributions:**
-- ✅ **Rocky Linux 9** (Recommended)
-- ✅ **AlmaLinux 9**
-- ✅ **CentOS Stream 9**
-- ✅ **RHEL 9** (with subscription)
+
+- ✓ **Rocky Linux 9** (Recommended)
+- ✓ **AlmaLinux 9**
+- ✓ **CentOS Stream 9**
+- ✓ **RHEL 9** (with subscription)
 
 ### **Prerequisites:**
-- **✅ Rocky Linux 9** system already installed and running
-- **✅ Network configured** (static IP, hostname, basic connectivity)
-- **✅ SSH access** and sudo privileges
-- **❌ Container Runtime:** Will be installed by this guide
+
+- **✓ Rocky Linux 9** system already installed and running
+- **✓ Network configured** (static IP, hostname, basic connectivity)
+- **✓ SSH access** and sudo privileges
+- **✗ Container Runtime:** Will be installed by this guide
 
 ---
 
 ## Quick Start Commands
 
-### **🐳 For Containerized BindCaptain (This Guide):**
+### **For Containerized BindCaptain (This Guide):**
+
 ```bash
 # For Rocky Linux 9 - prepares system for DNS containers
 curl -fsSL https://raw.githubusercontent.com/randyoyarzabal/bindcaptain/main/scripts/setup-rocky9.sh | bash
 ```
 
-### **📦 For Native BIND Installation (Alternative):**
+### **For Native BIND Installation (Alternative):**
 ```bash
 # Traditional approach - NOT covered by this guide
 sudo dnf install -y bind bind-utils

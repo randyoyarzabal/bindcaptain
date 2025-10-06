@@ -12,7 +12,7 @@ IMAGE_TAG="latest"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default paths (can be overridden by user)
-USER_CONFIG_DIR="${USER_CONFIG_DIR:-$SCRIPT_DIR/config}"
+BINDCAPTAIN_CONFIG_PATH="${BINDCAPTAIN_CONFIG_PATH:-$SCRIPT_DIR/config}"
 # Direct mount from bindcaptain directory - no staging needed
 
 # Colors for output
@@ -69,14 +69,14 @@ check_podman() {
 
 # Validate user configuration directory
 validate_user_config() {
-    print_status "info" "Validating user configuration directory: $USER_CONFIG_DIR"
+    print_status "info" "Validating user configuration directory: $BINDCAPTAIN_CONFIG_PATH"
     
-    if [ ! -d "$USER_CONFIG_DIR" ]; then
-        print_status "error" "User configuration directory not found: $USER_CONFIG_DIR"
+    if [ ! -d "$BINDCAPTAIN_CONFIG_PATH" ]; then
+        print_status "error" "User configuration directory not found: $BINDCAPTAIN_CONFIG_PATH"
         echo "  Please create your configuration directory with:"
-        echo "  mkdir -p $USER_CONFIG_DIR"
-        echo "  cp config-examples/* $USER_CONFIG_DIR/"
-        echo "  # Edit files in $USER_CONFIG_DIR/ for your setup"
+        echo "  mkdir -p $BINDCAPTAIN_CONFIG_PATH"
+        echo "  cp config-examples/* $BINDCAPTAIN_CONFIG_PATH/"
+        echo "  # Edit files in $BINDCAPTAIN_CONFIG_PATH/ for your setup"
         exit 1
     fi
     
@@ -85,28 +85,28 @@ validate_user_config() {
     local missing_files=()
     
     for file in "${required_files[@]}"; do
-        if [ ! -f "$USER_CONFIG_DIR/$file" ]; then
+        if [ ! -f "$BINDCAPTAIN_CONFIG_PATH/$file" ]; then
             missing_files+=("$file")
         fi
     done
     
     if [ ${#missing_files[@]} -gt 0 ]; then
-        print_status "error" "Missing required files in $USER_CONFIG_DIR:"
+        print_status "error" "Missing required files in $BINDCAPTAIN_CONFIG_PATH:"
         for file in "${missing_files[@]}"; do
             echo "    - $file"
         done
-        echo "  Copy examples: cp config-examples/* $USER_CONFIG_DIR/"
+        echo "  Copy examples: cp config-examples/* $BINDCAPTAIN_CONFIG_PATH/"
         exit 1
     fi
     
     # Validate named.conf
-    if ! named-checkconf "$USER_CONFIG_DIR/named.conf"; then
-        print_status "error" "Invalid BIND configuration in $USER_CONFIG_DIR/named.conf"
+    if ! named-checkconf "$BINDCAPTAIN_CONFIG_PATH/named.conf"; then
+        print_status "error" "Invalid BIND configuration in $BINDCAPTAIN_CONFIG_PATH/named.conf"
         exit 1
     fi
     
     # Count zone files
-    local zone_count=$(find "$USER_CONFIG_DIR" -name "*.db" | wc -l)
+    local zone_count=$(find "$BINDCAPTAIN_CONFIG_PATH" -name "*.db" | wc -l)
     print_status "success" "Configuration validated ($zone_count zone files found)"
 }
 
@@ -154,13 +154,13 @@ prepare_config() {
     print_status "info" "Preparing configuration for direct mounting..."
     
     # Ensure proper permissions on source config files
-    sudo chown -R named:named "$USER_CONFIG_DIR"
-    sudo chmod 644 "$USER_CONFIG_DIR/named.conf"
-    sudo chmod 644 "$USER_CONFIG_DIR"/*/*.db 2>/dev/null || true
+    sudo chown -R named:named "$BINDCAPTAIN_CONFIG_PATH"
+    sudo chmod 644 "$BINDCAPTAIN_CONFIG_PATH/named.conf"
+    sudo chmod 644 "$BINDCAPTAIN_CONFIG_PATH"/*/*.db 2>/dev/null || true
     
     # Create necessary directories for container operation
-    mkdir -p "$USER_CONFIG_DIR/data" "$USER_CONFIG_DIR/logs"
-    sudo chown -R named:named "$USER_CONFIG_DIR/data" "$USER_CONFIG_DIR/logs"
+    mkdir -p "$BINDCAPTAIN_CONFIG_PATH/data" "$BINDCAPTAIN_CONFIG_PATH/logs"
+    sudo chown -R named:named "$BINDCAPTAIN_CONFIG_PATH/data" "$BINDCAPTAIN_CONFIG_PATH/logs"
     
     print_status "success" "Configuration prepared for direct mounting"
 }
@@ -171,9 +171,9 @@ prepare_config() {
 detect_bind_ip() {
     local bind_ip="172.25.50.156"  # Default fallback
     
-    if [ -f "$USER_CONFIG_DIR/named.conf" ]; then
+    if [ -f "$BINDCAPTAIN_CONFIG_PATH/named.conf" ]; then
         # Try to extract listen-on IP
-        local extracted_ip=$(grep -E "listen-on.*port.*53.*{" "$USER_CONFIG_DIR/named.conf" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        local extracted_ip=$(grep -E "listen-on.*port.*53.*{" "$BINDCAPTAIN_CONFIG_PATH/named.conf" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
         if [ -n "$extracted_ip" ]; then
             bind_ip="$extracted_ip"
         fi
@@ -191,13 +191,13 @@ run_container() {
     # Run container with direct mounting from source config
     podman run -d \
         --name "$CONTAINER_NAME" \
-        --hostname "ns1.$(basename $USER_CONFIG_DIR)" \
+        --hostname "ns1.$(basename $BINDCAPTAIN_CONFIG_PATH)" \
         -p "${bind_ip}:53:53/tcp" \
         -p "${bind_ip}:53:53/udp" \
-        -v "$USER_CONFIG_DIR/named.conf:/etc/named.conf:ro,Z" \
-        -v "$USER_CONFIG_DIR:/var/named:rw,Z" \
-        -v "$USER_CONFIG_DIR/data:/var/named/data:rw,Z" \
-        -v "$USER_CONFIG_DIR/logs:/var/log/named:rw,Z" \
+        -v "$BINDCAPTAIN_CONFIG_PATH/named.conf:/etc/named.conf:ro,Z" \
+        -v "$BINDCAPTAIN_CONFIG_PATH:/var/named:rw,Z" \
+        -v "$BINDCAPTAIN_CONFIG_PATH/data:/var/named/data:rw,Z" \
+        -v "$BINDCAPTAIN_CONFIG_PATH/logs:/var/log/named:rw,Z" \
         -v "$SCRIPT_DIR/tools:/usr/local/scripts:ro,Z" \
         --env TZ="${TZ:-UTC}" \
         --env BIND_USER=named \
@@ -230,8 +230,8 @@ check_status() {
         local test_passed=false
         
         # Try to find a zone to test
-        if [ -f "$USER_CONFIG_DIR/named.conf" ]; then
-            local test_zone=$(grep -E '^[[:space:]]*zone[[:space:]]+\"' "$USER_CONFIG_DIR/named.conf" | grep -v '"\."' | head -1 | sed 's/.*zone[[:space:]]*"\([^"]*\)".*/\1/')
+        if [ -f "$BINDCAPTAIN_CONFIG_PATH/named.conf" ]; then
+            local test_zone=$(grep -E '^[[:space:]]*zone[[:space:]]+\"' "$BINDCAPTAIN_CONFIG_PATH/named.conf" | grep -v '"\."' | head -1 | sed 's/.*zone[[:space:]]*"\([^"]*\)".*/\1/')
             if [ -n "$test_zone" ]; then
                 if dig "@$bind_ip" "$test_zone" SOA +short >/dev/null 2>&1; then
                     print_status "success" "DNS is responding correctly for zone: $test_zone"
@@ -262,8 +262,8 @@ show_info() {
     echo "  Name: $CONTAINER_NAME"
     echo "  Image: ${IMAGE_NAME}:${IMAGE_TAG}"
     echo "  DNS IP: $bind_ip:53"
-    echo "  User Config: $USER_CONFIG_DIR"
-    echo "  Mount Source: $USER_CONFIG_DIR (direct mount)"
+    echo "  User Config: $BINDCAPTAIN_CONFIG_PATH"
+    echo "  Mount Source: $BINDCAPTAIN_CONFIG_PATH (direct mount)"
     echo
     
     print_status "info" "Useful Commands:"
@@ -277,6 +277,138 @@ show_info() {
 }
 
 # Show help
+# Systemctl service management functions
+install_service() {
+    print_header
+    check_root
+    check_podman
+    
+    local service_file="/etc/systemd/system/bindcaptain.service"
+    local script_path="/opt/bindcaptain/bindcaptain.sh"
+    local install_dir="/opt/bindcaptain"
+    local config_dir="$install_dir/config"
+    
+    print_status "info" "Installing BindCaptain systemd service..."
+    
+    # Create /opt/bindcaptain directory if it doesn't exist
+    if [ ! -d "$install_dir" ]; then
+        print_status "info" "Creating installation directory: $install_dir"
+        mkdir -p "$install_dir"
+    fi
+    
+    # Copy script to /opt/bindcaptain
+    print_status "info" "Installing script to $script_path..."
+    cp "$SCRIPT_DIR/bindcaptain.sh" "$script_path"
+    chmod +x "$script_path"
+    
+    # Copy service file
+    print_status "info" "Installing service file to $service_file..."
+    cp "$SCRIPT_DIR/bindcaptain.service" "$service_file"
+    
+    # Create config directory if it doesn't exist
+    if [ ! -d "$config_dir" ]; then
+        print_status "info" "Creating config directory: $config_dir"
+        mkdir -p "$config_dir"
+        
+        # Copy example configs if they exist
+        if [ -d "$SCRIPT_DIR/config-examples" ]; then
+            print_status "info" "Copying example configurations..."
+            cp -r "$SCRIPT_DIR/config-examples"/* "$config_dir/"
+        fi
+    fi
+    
+    # Reload systemd
+    print_status "info" "Reloading systemd daemon..."
+    systemctl daemon-reload
+    
+    print_status "success" "Service installed successfully!"
+    echo
+    echo "Next steps:"
+    echo "1. Configure your DNS settings in $config_dir"
+    echo "2. Enable the service: sudo systemctl enable bindcaptain"
+    echo "3. Start the service: sudo systemctl start bindcaptain"
+    echo "4. Check status: sudo systemctl status bindcaptain"
+    echo
+    echo "Service management:"
+    echo "  sudo systemctl start bindcaptain    # Start service"
+    echo "  sudo systemctl stop bindcaptain     # Stop service"
+    echo "  sudo systemctl restart bindcaptain  # Restart service"
+    echo "  sudo systemctl status bindcaptain   # Check status"
+    echo "  sudo systemctl enable bindcaptain   # Enable at boot"
+    echo "  sudo systemctl disable bindcaptain  # Disable at boot"
+}
+
+uninstall_service() {
+    print_header
+    check_root
+    
+    print_status "info" "Uninstalling BindCaptain systemd service..."
+    
+    # Stop and disable service
+    systemctl stop bindcaptain 2>/dev/null || true
+    systemctl disable bindcaptain 2>/dev/null || true
+    
+    # Remove service file
+    rm -f /etc/systemd/system/bindcaptain.service
+    
+    # Reload systemd
+    systemctl daemon-reload
+    
+    print_status "success" "Service uninstalled successfully"
+}
+
+enable_service() {
+    print_header
+    check_root
+    
+    print_status "info" "Enabling BindCaptain service to start at boot..."
+    systemctl enable bindcaptain
+    print_status "success" "Service enabled for startup"
+}
+
+disable_service() {
+    print_header
+    check_root
+    
+    print_status "info" "Disabling BindCaptain service from starting at boot..."
+    systemctl disable bindcaptain
+    print_status "success" "Service disabled from startup"
+}
+
+start_service() {
+    print_header
+    check_root
+    
+    print_status "info" "Starting BindCaptain service..."
+    systemctl start bindcaptain
+    print_status "success" "Service started"
+}
+
+stop_service() {
+    print_header
+    check_root
+    
+    print_status "info" "Stopping BindCaptain service..."
+    systemctl stop bindcaptain
+    print_status "success" "Service stopped"
+}
+
+restart_service() {
+    print_header
+    check_root
+    
+    print_status "info" "Restarting BindCaptain service..."
+    systemctl restart bindcaptain
+    print_status "success" "Service restarted"
+}
+
+show_service_status() {
+    print_header
+    print_status "info" "BindCaptain service status:"
+    echo
+    systemctl status bindcaptain --no-pager
+}
+
 show_help() {
     print_header
     echo "BIND DNS Container Management"
@@ -284,11 +416,11 @@ show_help() {
     echo "Usage: $0 [COMMAND] [OPTIONS]"
     echo
     echo "Environment Variables:"
-    echo "  USER_CONFIG_DIR      - Directory with your BIND configuration (default: ./config)"
+    echo "  BINDCAPTAIN_CONFIG_PATH      - Directory with your BIND configuration (default: ./config)"
     echo "  BIND_DEBUG_LEVEL     - BIND debug level (default: 1)"
     echo "  TZ                   - Timezone (default: UTC)"
     echo
-    echo "Commands:"
+    echo "Container Commands:"
     echo "  build         - Build the container image"
     echo "  run           - Run the container (builds if needed)"
     echo "  stop          - Stop the container"
@@ -298,23 +430,68 @@ show_help() {
     echo "  shell         - Enter container shell"
     echo "  cleanup       - Remove container and image"
     echo "  validate      - Validate user configuration"
-    echo "  help          - Show this help"
+    echo
+    echo "Service Commands:"
+    echo "  install       - Install systemd service"
+    echo "  uninstall     - Uninstall systemd service"
+    echo "  enable        - Enable service to start at boot"
+    echo "  disable       - Disable service from starting at boot"
+    echo "  start         - Start the service"
+    echo "  stop-service  - Stop the service"
+    echo "  restart       - Restart the service"
+    echo "  service-status - Show service status"
+    echo
+    echo "First Time Setup:"
+    echo "  The script will offer to install the systemd service"
+    echo "  when 'run' is executed as root and service is not found."
     echo
     echo "Examples:"
-    echo "  # Use default config directory"
+    echo "  # First time setup (will prompt for service installation)"
     echo "  sudo $0 run"
     echo
+    echo "  # Manual service installation"
+    echo "  sudo $0 install"
+    echo "  sudo $0 enable"
+    echo "  sudo $0 start"
+    echo
     echo "  # Use custom configuration directory"
-    echo "  USER_CONFIG_DIR=/path/to/my/dns-config sudo $0 run"
+    echo "  BINDCAPTAIN_CONFIG_PATH=/path/to/my/dns-config sudo $0 run"
     echo
-    echo "  # Use custom data directory"
-    echo "  USER_CONFIG_DIR=/opt/my-dns-config sudo $0 run"
-    echo
+}
+
+# Check if service is installed and offer installation for run command
+check_and_install_service() {
+    if [ ! -f "/etc/systemd/system/bindcaptain.service" ] && [ "$EUID" -eq 0 ]; then
+        echo
+        print_status "info" "Systemd service not found."
+        echo "BindCaptain can be installed as a systemd service for automatic startup."
+        echo
+        read -p "Would you like to install the systemd service? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            install_service
+            echo
+            read -p "Would you like to enable and start the service now? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                systemctl enable bindcaptain
+                systemctl start bindcaptain
+                print_status "success" "Service enabled and started!"
+                echo "Check status with: systemctl status bindcaptain"
+            fi
+            echo
+        fi
+    fi
 }
 
 # Main execution
 main() {
     local command=${1:-"help"}
+    
+    # Check for service installation for run command
+    if [ "$command" == "run" ] && [ "$EUID" -eq 0 ]; then
+        check_and_install_service
+    fi
     
     case $command in
         "build")
@@ -400,6 +577,38 @@ main() {
             print_header
             validate_user_config
             print_status "success" "User configuration is valid"
+            ;;
+            
+        "install")
+            install_service
+            ;;
+            
+        "uninstall")
+            uninstall_service
+            ;;
+            
+        "enable")
+            enable_service
+            ;;
+            
+        "disable")
+            disable_service
+            ;;
+            
+        "start")
+            start_service
+            ;;
+            
+        "stop-service")
+            stop_service
+            ;;
+            
+        "restart")
+            restart_service
+            ;;
+            
+        "service-status")
+            show_service_status
             ;;
             
         "help"|"-h"|"--help")

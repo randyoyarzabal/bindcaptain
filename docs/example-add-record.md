@@ -2,7 +2,7 @@
 
 ## Scenario: Add `newserver.example.com` → `192.168.1.200`
 
-### ⚡ **Using BindCaptain Manager (Recommended)**
+### **Using BindCaptain Manager (Recommended)**
 
 ### Step 1: Add the A Record
 ```bash
@@ -50,12 +50,12 @@ sudo tail /opt/bindcaptain/logs/dns_refresh.log
 
 ## That's it! 
 
-✅ **Serial number automatically incremented**  
-✅ **Zone validated before applying**  
-✅ **Backup created automatically**  
-✅ **BIND reloaded automatically**  
-✅ **Reverse DNS entry will be created** within 5 minutes by cron  
-✅ **Synology slaves automatically notified**
+✓ **Serial number automatically incremented**  
+✓ **Zone validated before applying**  
+✓ **Backup created automatically**  
+✓ **BIND reloaded automatically**  
+✓ **Reverse DNS entry will be created** within 5 minutes by cron  
+✓ **Synology slaves automatically notified**
 
 ---
 

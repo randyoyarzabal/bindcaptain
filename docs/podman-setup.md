@@ -1,4 +1,4 @@
-# 🐳 Podman Setup for BindCaptain DNS Services
+# Podman Setup for BindCaptain DNS Services
 
 **Comprehensive guide for configuring Podman on Rocky Linux 9 to run DNS containers as root**
 
@@ -15,10 +15,10 @@ This guide focuses specifically on Podman configuration for DNS services that re
 - **Container Reality:** Easiest and most reliable approach is root containers
 
 ### **Alternatives Considered:**
-- ❌ **Rootless + CAP_NET_BIND_SERVICE:** Complex capability management
-- ❌ **Port Forwarding:** iptables complexity, performance overhead  
-- ❌ **User Namespaces:** Complicated networking setup
-- ✅ **Root Container:** Simple, reliable, industry standard
+- ✗ **Rootless + CAP_NET_BIND_SERVICE:** Complex capability management
+- ✗ **Port Forwarding:** iptables complexity, performance overhead  
+- ✗ **User Namespaces:** Complicated networking setup
+- ✓ **Root Container:** Simple, reliable, industry standard
 
 ---
 
@@ -366,5 +366,5 @@ sudo podman run --rm alpine:latest ping -c 3 8.8.8.8
 
 ---
 
-*🐳 Your Rocky Linux 9 system is now optimized for BindCaptain DNS containers running as root with full port 53 access!*
+*Your Rocky Linux 9 system is now optimized for BindCaptain DNS containers running as root with full port 53 access!*
 

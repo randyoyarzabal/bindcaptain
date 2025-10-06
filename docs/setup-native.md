@@ -1,8 +1,8 @@
-# 📦 Native BIND Setup Guide for Rocky Linux 9
+# Native BIND Setup Guide for Rocky Linux 9
 
 **Traditional system-level BIND installation (alternative to containerized BindCaptain)**
 
-> **📦 NATIVE APPROACH:** This guide covers traditional **native BIND package installation** directly on the host system. This is **NOT** for containerized BindCaptain.
+> **NATIVE APPROACH:** This guide covers traditional **native BIND package installation** directly on the host system. This is **NOT** for containerized BindCaptain.
 
 If you prefer the traditional approach of installing BIND directly on your Rocky Linux 9 system, follow this guide instead of the containerized BindCaptain setup.
 
@@ -10,14 +10,14 @@ If you prefer the traditional approach of installing BIND directly on your Rocky
 
 ## When to Choose Native BIND
 
-### **✅ Native BIND is good for:**
+### **✓ Native BIND is good for:**
 - **Traditional environments** with existing BIND expertise
 - **Simple single-server** DNS setups
 - **Integration** with existing system management tools
 - **Direct file system access** for zone files
 - **Lower resource overhead** (no container layer)
 
-### **❌ Native BIND limitations:**
+### **✗ Native BIND limitations:**
 - **System dependency** - tied to host OS
 - **Harder migration** between systems
 - **Manual dependency management**
@@ -181,16 +181,16 @@ sudo systemctl enable --now named
 
 For **new deployments**, we recommend the **containerized BindCaptain approach** because:
 
-- ✅ **Modern DevOps practices** (Infrastructure as Code)
-- ✅ **Easier migration** between systems
-- ✅ **Better isolation** and security
-- ✅ **Consistent environment** across dev/staging/prod
-- ✅ **Automated deployment** and scaling
-- ✅ **Version control** for entire DNS infrastructure
+- ✓ **Modern DevOps practices** (Infrastructure as Code)
+- ✓ **Easier migration** between systems
+- ✓ **Better isolation** and security
+- ✓ **Consistent environment** across dev/staging/prod
+- ✓ **Automated deployment** and scaling
+- ✓ **Version control** for entire DNS infrastructure
 
 Choose **native BIND** only if you have specific requirements that mandate traditional system-level installation.
 
 ---
 
-*📦 This covers traditional BIND installation. For the recommended containerized approach, see [SETUP-SYSTEM.md](SETUP-SYSTEM.md)*
+*This covers traditional BIND installation. For the recommended containerized approach, see [SETUP-SYSTEM.md](SETUP-SYSTEM.md)*
 

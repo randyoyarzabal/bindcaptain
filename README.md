@@ -32,6 +32,49 @@ dig @your-server-ip yourdomain.com
 sudo bash -c "source ./bindcaptain_manager.sh && bind.create_record webserver yourdomain.com 192.168.1.100"
 ```
 
+## Systemd Service Setup (Recommended)
+
+For production use, BindCaptain can be installed as a systemd service for automatic startup:
+
+### Automatic First-Time Setup
+The script will offer to install the systemd service when `run` is executed and the service is not found:
+
+```bash
+# First time setup (will prompt for service installation)
+sudo ./bindcaptain.sh run
+```
+
+### Manual Service Installation
+```bash
+# Install systemd service
+sudo ./bindcaptain.sh install
+
+# Enable and start
+sudo ./bindcaptain.sh enable
+sudo ./bindcaptain.sh start
+
+# Check status
+sudo ./bindcaptain.sh service-status
+```
+
+### Service Management
+```bash
+# Using BindCaptain script
+sudo ./bindcaptain.sh start         # Start service
+sudo ./bindcaptain.sh stop-service  # Stop service
+sudo ./bindcaptain.sh restart       # Restart service
+sudo ./bindcaptain.sh service-status # Show status
+
+# Using systemctl directly
+sudo systemctl start bindcaptain
+sudo systemctl stop bindcaptain
+sudo systemctl restart bindcaptain
+sudo systemctl status bindcaptain
+sudo journalctl -u bindcaptain -f   # View logs
+```
+
+For detailed systemd setup instructions, see [Systemd Service Guide](docs/systemd-service.md).
+
 ## DNS Management
 
 ```bash
@@ -63,6 +106,16 @@ sudo ./bindcaptain.sh restart  # Restart container
 sudo ./bindcaptain.sh logs     # View container logs
 sudo ./bindcaptain.sh status   # Check container status
 
+# Service Management (systemd)
+sudo ./bindcaptain.sh install       # Install systemd service
+sudo ./bindcaptain.sh uninstall     # Uninstall systemd service
+sudo ./bindcaptain.sh enable        # Enable service at boot
+sudo ./bindcaptain.sh disable       # Disable service at boot
+sudo ./bindcaptain.sh start         # Start service
+sudo ./bindcaptain.sh stop-service  # Stop service
+sudo ./bindcaptain.sh restart       # Restart service
+sudo ./bindcaptain.sh service-status # Show service status
+
 # DNS Record Management (via bindcaptain_manager.sh)
 bind.create_record <hostname> <domain> <ip>     # Add A record + PTR (automatic)
 bind.create_cname <alias> <domain> <target>     # Add CNAME record  
@@ -84,6 +137,7 @@ bind.git_refresh [--force]                      # Update codebase from GitHub
 - **Auto-Reverse** - Automatic reverse DNS generation
 - **Production-Ready** - Used in real production environments
 
+
 ## Documentation
 
 Detailed guides available in [`docs/`](docs/):
@@ -91,18 +145,15 @@ Detailed guides available in [`docs/`](docs/):
 - **[docs/cheat-sheet.md](docs/cheat-sheet.md)** - Complete management reference
 - **[docs/setup-system.md](docs/setup-system.md)** - System prerequisites  
 - **[docs/example-add-record.md](docs/example-add-record.md)** - Step-by-step examples
+- **[docs/systemd-service.md](docs/systemd-service.md)** - Systemd service setup guide
 
 ## Architecture
 
 ```
 BindCaptain/
-├── bindcaptain.sh          # Container management
-├── bindcaptain_manager.sh  # DNS record management  
-├── config/                 # Your DNS zones
-│   ├── yourdomain.com/
-│   │   ├── yourdomain.com.db
-│   │   └── reverse zones
-│   └── named.conf
+├── bindcaptain.sh          # Container management + systemd service
+├── bindcaptain.service     # Systemd service file
+├── config-examples/        # Example configurations
 └── docs/                   # Documentation
 ```
 
