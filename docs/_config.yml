@@ -10,8 +10,8 @@ baseurl: /bindcaptain
 theme: jekyll-theme-minimal
 
 # Site settings
-logo: /bindcaptain/assets/images/logo.png
-favicon: /bindcaptain/assets/images/favicon.ico
+# logo: /bindcaptain/assets/images/logo.png
+# favicon: /bindcaptain/assets/images/favicon.ico
 
 # Navigation
 nav_external_links:
