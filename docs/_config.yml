@@ -1,7 +1,7 @@
 # GitHub Pages Configuration for BindCaptain
 # Theme: Minimal (GitHub supported theme)
 
-title: BindCaptain Documentation
+title: BindCaptain
 description: Containerized BIND DNS Server with Smart Management
 url: https://randyoyarzabal.github.io
 baseurl: /bindcaptain

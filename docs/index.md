@@ -1,4 +1,4 @@
-# BindCaptain Documentation
+# BindCaptain
 
 Welcome to **BindCaptain** - Take command of your DNS infrastructure with captain-grade precision.
 
