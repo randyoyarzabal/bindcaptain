@@ -48,6 +48,16 @@ dig @localhost yourdomain.com
 
 **Supported OS**: RHEL 8+, CentOS 8+, Rocky Linux 8+, AlmaLinux 8+, Fedora 30+, Ubuntu, Debian, Arch Linux
 
+### Environment Variables
+
+- **`BINDCAPTAIN_CONFIG_PATH`** - Path to your DNS configuration directory (default: `./config`)
+- **`TZ`** - Timezone setting (default: `UTC`)
+
+```bash
+# Use custom configuration directory
+BINDCAPTAIN_CONFIG_PATH=/path/to/my/dns-config sudo ./bindcaptain.sh run
+```
+
 > **📖 Need detailed setup instructions?** See [System Requirements](docs/system-requirements.md) and [Manual Setup Guide](docs/manual-setup.md) for comprehensive installation steps.
 
 ## 🔧 Production Setup
