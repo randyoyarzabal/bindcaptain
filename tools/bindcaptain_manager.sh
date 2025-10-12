@@ -958,34 +958,33 @@ bind.list_records() {
             if [ "$type" == "NS" ] && { [ "$name" == "@" ] || [ "$name" == "$d" ]; }; then
                 continue
             fi
-                
-                # Filter by record type if specified
-                if [ -n "$record_type" ] && [ "$type" != "$record_type" ]; then
-                    continue
-                fi
-                
-                # Build FQDN
-                local fqdn
-                if [[ "$name" == "@" ]]; then
-                    fqdn="$d"
-                elif [[ "$name" =~ \.$ ]]; then
-                    # Already absolute
-                    fqdn="${name%.}"
-                elif [[ "$current_origin" == "$d." ]]; then
-                    # At main domain origin
-                    fqdn="${name}.${d}"
-                else
-                    # At subdomain origin
-                    fqdn="${name}.${current_origin%.}"
-                fi
-                
-                # Clean up value - remove trailing dots for display
-                value="${value%;}"
-                value="${value%.}"
-                
-                printf "%-45s ${GREEN}%-8s${NC} %s\n" "$fqdn" "$type" "$value"
-                ((count++))
+            
+            # Filter by record type if specified
+            if [ -n "$record_type" ] && [ "$type" != "$record_type" ]; then
+                continue
             fi
+            
+            # Build FQDN
+            local fqdn
+            if [[ "$name" == "@" ]]; then
+                fqdn="$d"
+            elif [[ "$name" =~ \.$ ]]; then
+                # Already absolute
+                fqdn="${name%.}"
+            elif [[ "$current_origin" == "$d." ]]; then
+                # At main domain origin
+                fqdn="${name}.${d}"
+            else
+                # At subdomain origin
+                fqdn="${name}.${current_origin%.}"
+            fi
+            
+            # Clean up value - remove trailing dots for display
+            value="${value%;}"
+            value="${value%.}"
+            
+            printf "%-45s ${GREEN}%-8s${NC} %s\n" "$fqdn" "$type" "$value"
+            ((count++))
         done < "$zone_file"
         
         echo
