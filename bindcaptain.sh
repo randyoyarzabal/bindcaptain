@@ -19,7 +19,7 @@ BINDCAPTAIN_CONFIG_PATH="${BINDCAPTAIN_CONFIG_PATH:-$SCRIPT_DIR/config}"
 
 # Custom header for this script
 print_bindcaptain_header() {
-    print_bindcaptain_header "BIND DNS Container"
+    print_header "BIND DNS Container"
 }
 
 # Validate user configuration directory

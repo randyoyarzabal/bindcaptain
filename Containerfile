@@ -83,10 +83,6 @@ RUN chown -R named:named /var/named /var/log/named /var/run/named && \
 # Create rndc key if not exists
 RUN rndc-confgen -a || true
 
-# Copy container startup script
-COPY tools/container_start.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/container_start.sh
-
 # Expose DNS ports
 EXPOSE 53/udp 53/tcp 953/tcp
 
