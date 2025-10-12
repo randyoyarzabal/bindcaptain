@@ -1,0 +1,28 @@
+# Configuration backups
+backups/
+config.backup.*/
+config/
+
+# Runtime logs
+logs/
+
+# Test outputs and configs
+tests/results/
+tests/test-configs/
+
+# BIND runtime data
+*.jnl
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.vim
+*.swp
+.vscode/
+.idea/
+
