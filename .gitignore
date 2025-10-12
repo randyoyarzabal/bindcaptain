@@ -1,7 +1,9 @@
 # Configuration backups
 backups/
+config.backup
 config.backup.*/
 config/
+config
 
 # Runtime logs
 logs/
