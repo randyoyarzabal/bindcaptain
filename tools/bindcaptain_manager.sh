@@ -897,16 +897,62 @@ bind.list_records() {
         fi
         
         echo -e "${CYAN}=== $d ===${NC}"
+        printf "%-45s %-8s %s\n" "FQDN" "TYPE" "VALUE"
+        printf "%-45s %-8s %s\n" "----" "----" "-----"
         
-        local records
-        if [ -n "$record_type" ]; then
-            records=$(grep "IN\s*$record_type\s" "$zone_file" | grep -v "^;")
-        else
-            records=$(grep "IN\s*[A-Z]" "$zone_file" | grep -v "^;")
-        fi
+        # Parse zone file and track $ORIGIN
+        local current_origin="$d."
+        local count=0
         
-        local count=$(echo "$records" | grep -c "IN" || echo "0")
-        echo "$records"
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ "$line" =~ ^[[:space:]]*; ]] && continue
+            [[ -z "$line" ]] && continue
+            
+            # Track $ORIGIN changes
+            if [[ "$line" =~ ^\$ORIGIN[[:space:]]+(.+) ]]; then
+                current_origin="${BASH_REMATCH[1]}"
+                [[ ! "$current_origin" =~ \.$ ]] && current_origin="${current_origin}."
+                continue
+            fi
+            
+            # Parse DNS records
+            if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+IN[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+                local name="${BASH_REMATCH[1]}"
+                local type="${BASH_REMATCH[2]}"
+                local value="${BASH_REMATCH[3]}"
+                
+                # Filter by record type if specified
+                if [ -n "$record_type" ] && [ "$type" != "$record_type" ]; then
+                    continue
+                fi
+                
+                # Build FQDN
+                local fqdn
+                if [[ "$name" == "@" ]]; then
+                    fqdn="$d"
+                elif [[ "$name" =~ \.$ ]]; then
+                    # Already absolute
+                    fqdn="${name%.}"
+                elif [[ "$current_origin" == "$d." ]]; then
+                    # At main domain origin
+                    fqdn="${name}.${d}"
+                else
+                    # At subdomain origin
+                    fqdn="${name}.${current_origin%.}"
+                fi
+                
+                # Clean up value - remove trailing dots for display
+                value="${value%;}"
+                value="${value%.}"
+                
+                printf "%-45s ${GREEN}%-8s${NC} %s\n" "$fqdn" "$type" "$value"
+                ((count++))
+            fi
+        done < "$zone_file"
+        
+        echo
         echo -e "${GREEN}Total: $count records${NC}"
         echo
     done
