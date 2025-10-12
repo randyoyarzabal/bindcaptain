@@ -898,11 +898,16 @@ bind.list_records() {
         
         echo -e "${CYAN}=== $d ===${NC}"
         
+        local records
         if [ -n "$record_type" ]; then
-            grep "IN\s*$record_type\s" "$zone_file" | grep -v "^;" | head -20
+            records=$(grep "IN\s*$record_type\s" "$zone_file" | grep -v "^;")
         else
-            grep "IN\s*[A-Z]" "$zone_file" | grep -v "^;" | head -20
+            records=$(grep "IN\s*[A-Z]" "$zone_file" | grep -v "^;")
         fi
+        
+        local count=$(echo "$records" | grep -c "IN" || echo "0")
+        echo "$records"
+        echo -e "${GREEN}Total: $count records${NC}"
         echo
     done
 }
