@@ -18,7 +18,6 @@
 #   bind.create_txt       - Create DNS TXT record
 #   bind.delete_record    - Delete DNS record
 #   bind.list_records     - List DNS records
-#   bind.git_refresh      - Update codebase from GitHub
 #   refresh               - Refresh and validate DNS configuration
 #   show_environment      - Show environment information
 #
@@ -992,102 +991,6 @@ bind.list_records() {
         echo
     done
 }
-
-# Function: bind.git_refresh
-bind.git_refresh() {
-    if [[ "$1" == "--help" ]] || [[ "$1" == "-?" ]]; then
-        print_status "info" "bind.git_refresh - Update BindCaptain codebase from GitHub"
-        echo
-        echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.git_refresh [--force]"
-        echo
-        echo -e "${YELLOW}Description:${NC}"
-        echo "  Updates the BindCaptain codebase from the GitHub repository"
-        echo "  Preserves your local configuration files"
-        echo
-        echo -e "${YELLOW}Options:${NC}"
-        echo "  --force    Force update even if there are uncommitted changes"
-        echo
-        echo -e "${YELLOW}Examples:${NC}"
-        echo "  bind.git_refresh           # Standard update"
-        echo "  bind.git_refresh --force   # Force update"
-        return 0
-    fi
-
-    print_status "info" "Updating BindCaptain codebase from GitHub..."
-    
-    local force_update="false"
-    if [[ "$1" == "--force" ]]; then
-        force_update="true"
-    fi
-    
-    # Determine the correct directory
-    local bindcaptain_dir
-    if [[ -d "/opt/bindcaptain" ]]; then
-        bindcaptain_dir="/opt/bindcaptain"
-    elif [[ -d "/home/techno/bind" ]]; then
-        bindcaptain_dir="/home/techno/bind"
-    else
-        print_status "error" "BindCaptain directory not found"
-        return 1
-    fi
-    
-    print_status "info" "Working in: $bindcaptain_dir"
-    
-    # Change to the directory
-    cd "$bindcaptain_dir" || {
-        print_status "error" "Failed to access $bindcaptain_dir"
-        return 1
-    }
-    
-    # Check if it's a git repository
-    if [[ ! -d ".git" ]]; then
-        print_status "error" "Not a git repository. Initialize with: git clone https://github.com/randyoyarzabal/bindcaptain.git"
-        return 1
-    fi
-    
-    # Fix git ownership issues when running as root
-    if [[ "$EUID" -eq 0 ]]; then
-        print_status "info" "Configuring git safe directory for root access..."
-        git config --global --add safe.directory "$bindcaptain_dir" 2>/dev/null || true
-    fi
-    
-    # Backup config if it exists
-    if [[ -d "config" ]]; then
-        print_status "info" "Backing up local configuration..."
-        cp -r config config.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
-    fi
-    
-    # Check for uncommitted changes
-    if ! $force_update && [[ -n "$(git status --porcelain)" ]]; then
-        print_status "warning" "Uncommitted changes detected. Use --force to proceed anyway"
-        git status --short
-        return 1
-    fi
-    
-    # Fetch and pull latest changes
-    print_status "info" "Fetching latest changes from GitHub..."
-    git fetch origin || {
-        print_status "error" "Failed to fetch from remote repository"
-        return 1
-    }
-    
-    # Get current branch
-    local current_branch
-    current_branch=$(git branch --show-current)
-    
-    print_status "info" "Updating branch: $current_branch"
-    git pull origin "$current_branch" || {
-        print_status "error" "Failed to pull changes. You may need to resolve conflicts manually"
-        return 1
-    }
-    
-    print_status "success" "BindCaptain codebase updated successfully!"
-    print_status "info" "If you have a running container, restart it with: sudo /opt/bindcaptain/bindcaptain.sh restart"
-    
-    return 0
-}
-
 # Show environment info
 show_environment() {
     print_manager_header
@@ -1133,9 +1036,6 @@ main() {
             bind.list_records)
                 bind.list_records "$@"
                 ;;
-            bind.git_refresh)
-                bind.git_refresh "$@"
-                ;;
             show_environment)
                 show_environment "$@"
                 ;;
@@ -1151,7 +1051,6 @@ main() {
                 echo -e "  ${GREEN}bind.create_txt${NC}     - Create DNS TXT record"
                 echo -e "  ${GREEN}bind.delete_record${NC}  - Delete DNS record"
                 echo -e "  ${GREEN}bind.list_records${NC}   - List DNS records"
-                echo -e "  ${GREEN}bind.git_refresh${NC}    - Update codebase from GitHub"
                 echo -e "  ${GREEN}refresh${NC}             - Refresh and validate DNS configuration"
                 echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
             echo
