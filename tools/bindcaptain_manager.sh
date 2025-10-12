@@ -345,11 +345,17 @@ bind.create_record() {
     # Check if record already exists
     if grep -q "^${hostname}\s" "$zone_file"; then
         print_status "warning" "Record $hostname already exists in $domain"
-        read -p "Overwrite existing record? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_status "info" "Operation cancelled"
-            return 0
+        
+        # In non-interactive mode, automatically overwrite
+        if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
+            print_status "info" "Non-interactive mode: overwriting existing record"
+        else
+            read -p "Overwrite existing record? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_status "info" "Operation cancelled"
+                return 0
+            fi
         fi
         # Remove existing record
         sed -i "/^${hostname}\s/d" "$zone_file"
@@ -464,11 +470,17 @@ bind.create_cname() {
     # Check if record already exists
     if grep -q "^${alias}\s" "$zone_file"; then
         print_status "warning" "Record $alias already exists in $domain"
-        read -p "Overwrite existing record? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_status "info" "Operation cancelled"
-            return 0
+        
+        # In non-interactive mode, automatically overwrite
+        if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
+            print_status "info" "Non-interactive mode: overwriting existing record"
+        else
+            read -p "Overwrite existing record? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_status "info" "Operation cancelled"
+                return 0
+            fi
         fi
         # Remove existing record
         sed -i "/^${alias}\s/d" "$zone_file"
@@ -687,11 +699,16 @@ bind.delete_record() {
     grep "$search_pattern" "$zone_file"
     echo
     
-    read -p "Delete these records? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_status "info" "Operation cancelled"
-        return 0
+    # In non-interactive mode, automatically delete
+    if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
+        print_status "info" "Non-interactive mode: deleting records"
+    else
+        read -p "Delete these records? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "info" "Operation cancelled"
+            return 0
+        fi
     fi
     
     # Backup zone file
