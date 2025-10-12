@@ -60,6 +60,9 @@ source "$SCRIPT_DIR/common.sh"
 LOG_FILE="$LOG_DIR/bind_manager.log"
 BACKUP_DIR="$CONTAINER_DATA_DIR/backups"
 
+# Backup control - disabled by default
+ENABLE_BACKUPS="${BINDCAPTAIN_ENABLE_BACKUPS:-false}"
+
 # Manager-specific variables
 DOMAINS=($(discover_domains))
 DEFAULT_TTL="86400"
@@ -115,6 +118,11 @@ validate_domain_in_config() {
 
 # Backup zone file
 backup_zone() {
+    # Skip backup if disabled
+    if [[ "$ENABLE_BACKUPS" != "true" ]]; then
+        return 0
+    fi
+    
     local domain=$1
     local zone_file="$BIND_DIR/${domain}/${domain}.db"
     if [ ! -f "$zone_file" ]; then
@@ -306,6 +314,10 @@ bind.create_record() {
                 show_help=true
                 shift
                 ;;
+            --backup)
+                ENABLE_BACKUPS=true
+                shift
+                ;;
             *)
                 break
                 ;;
@@ -316,8 +328,11 @@ bind.create_record() {
         echo -e "${WHITE}bind.create_record${NC} - Create DNS A record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.create_record <fqdn> <ip_address> [ttl]"
-        echo "  bind.create_record <hostname> <domain> <ip_address> [ttl]"
+        echo "  bind.create_record [--backup] <fqdn> <ip_address> [ttl]"
+        echo "  bind.create_record [--backup] <hostname> <domain> <ip_address> [ttl]"
+        echo
+        echo -e "${YELLOW}Options:${NC}"
+        echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
         echo -e "  ${GREEN}fqdn${NC}       - Fully qualified domain name (e.g., webserver.homelab.io)"
@@ -334,6 +349,7 @@ bind.create_record() {
         echo -e "${YELLOW}Examples:${NC}"
         echo "  bind.create_record webserver.${DOMAINS[0]:-example.com} 172.25.50.100"
         echo "  bind.create_record webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
+        echo "  bind.create_record --backup webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
         return 0
     fi
     
@@ -461,6 +477,10 @@ bind.create_cname() {
                 show_help=true
                 shift
                 ;;
+            --backup)
+                ENABLE_BACKUPS=true
+                shift
+                ;;
             *)
                 break
                 ;;
@@ -471,8 +491,11 @@ bind.create_cname() {
         echo -e "${WHITE}bind.create_cname${NC} - Create DNS CNAME record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.create_cname <fqdn> <target>"
-        echo "  bind.create_cname <alias> <domain> <target>"
+        echo "  bind.create_cname [--backup] <fqdn> <target>"
+        echo "  bind.create_cname [--backup] <alias> <domain> <target>"
+        echo
+        echo -e "${YELLOW}Options:${NC}"
+        echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
         echo -e "  ${GREEN}fqdn${NC}       - Fully qualified domain name for alias (e.g., www.homelab.io)"
@@ -488,6 +511,7 @@ bind.create_cname() {
         echo -e "${YELLOW}Examples:${NC}"
         echo "  bind.create_cname www.${DOMAINS[0]:-example.com} webserver"
         echo "  bind.create_cname www ${DOMAINS[0]:-example.com} webserver"
+        echo "  bind.create_cname --backup www ${DOMAINS[0]:-example.com} webserver"
         return 0
     fi
     
@@ -603,6 +627,10 @@ bind.create_txt() {
                 show_help=true
                 shift
                 ;;
+            --backup)
+                ENABLE_BACKUPS=true
+                shift
+                ;;
             *)
                 break
                 ;;
@@ -613,7 +641,10 @@ bind.create_txt() {
         echo -e "${WHITE}bind.create_txt${NC} - Create DNS TXT record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.create_txt <name> <domain> <text_value>"
+        echo "  bind.create_txt [--backup] <name> <domain> <text_value>"
+        echo
+        echo -e "${YELLOW}Options:${NC}"
+        echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
         echo -e "  ${GREEN}name${NC}       - Record name (without domain, use @ for domain root)"
@@ -628,6 +659,7 @@ bind.create_txt() {
         echo -e "${YELLOW}Examples:${NC}"
         echo "  bind.create_txt @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
         echo "  bind.create_txt _dmarc ${DOMAINS[0]:-example.com} 'v=DMARC1; p=none'"
+        echo "  bind.create_txt --backup @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
         return 0
     fi
     
@@ -698,6 +730,10 @@ bind.delete_record() {
                 show_help=true
                 shift
                 ;;
+            --backup)
+                ENABLE_BACKUPS=true
+                shift
+                ;;
             *)
                 break
                 ;;
@@ -708,8 +744,11 @@ bind.delete_record() {
         echo -e "${WHITE}bind.delete_record${NC} - Delete DNS record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.delete_record <fqdn> [record_type]"
-        echo "  bind.delete_record <name> <domain> [record_type]"
+        echo "  bind.delete_record [--backup] <fqdn> [record_type]"
+        echo "  bind.delete_record [--backup] <name> <domain> [record_type]"
+        echo
+        echo -e "${YELLOW}Options:${NC}"
+        echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
         echo -e "  ${GREEN}fqdn${NC}        - Fully qualified domain name (e.g., webserver.homelab.io)"
@@ -726,6 +765,7 @@ bind.delete_record() {
         echo "  bind.delete_record webserver.${DOMAINS[0]:-example.com}"
         echo "  bind.delete_record webserver ${DOMAINS[0]:-example.com}"
         echo "  bind.delete_record www.${DOMAINS[0]:-example.com} CNAME"
+        echo "  bind.delete_record --backup webserver ${DOMAINS[0]:-example.com}"
         return 0
     fi
     
