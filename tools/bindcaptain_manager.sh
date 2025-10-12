@@ -903,12 +903,20 @@ bind.list_records() {
         # Parse zone file and track $ORIGIN
         local current_origin="$d."
         local count=0
+        local in_multiline=false
         
         while IFS= read -r line; do
             # Skip comments and empty lines
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ "$line" =~ ^[[:space:]]*\; ]] && continue
             [[ -z "$line" ]] && continue
+            
+            # Skip continuation lines (indented lines from multi-line records like SOA)
+            if [[ "$line" =~ ^[[:space:]]+[^[:space:]] ]] && [[ "$in_multiline" == true ]]; then
+                # Check if this is the closing parenthesis
+                [[ "$line" =~ \) ]] && in_multiline=false
+                continue
+            fi
             
             # Track $ORIGIN changes
             if [[ "$line" =~ ^\$ORIGIN[[:space:]]+(.+) ]]; then
@@ -917,11 +925,17 @@ bind.list_records() {
                 continue
             fi
             
-            # Parse DNS records
-            if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+IN[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+            # Parse DNS records (flexible whitespace, matches "name IN TYPE value" or "name TYPE value")
+            if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+(IN[[:space:]]+)?([A-Z]+)[[:space:]]+(.+)$ ]]; then
                 local name="${BASH_REMATCH[1]}"
-                local type="${BASH_REMATCH[2]}"
-                local value="${BASH_REMATCH[3]}"
+                local type="${BASH_REMATCH[3]}"
+                local value="${BASH_REMATCH[4]}"
+                
+                # Skip SOA records (zone metadata) and track multi-line
+                if [ "$type" == "SOA" ]; then
+                    [[ "$value" =~ \( ]] && in_multiline=true
+                    continue
+                fi
                 
                 # Filter by record type if specified
                 if [ -n "$record_type" ] && [ "$type" != "$record_type" ]; then
