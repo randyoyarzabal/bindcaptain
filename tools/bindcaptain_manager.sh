@@ -907,7 +907,7 @@ bind.list_records() {
         while IFS= read -r line; do
             # Skip comments and empty lines
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ "$line" =~ ^[[:space:]]*; ]] && continue
+            [[ "$line" =~ ^[[:space:]]*\; ]] && continue
             [[ -z "$line" ]] && continue
             
             # Track $ORIGIN changes
