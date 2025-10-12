@@ -912,9 +912,11 @@ bind.list_records() {
             [[ -z "$line" ]] && continue
             
             # Skip continuation lines (indented lines from multi-line records like SOA)
-            if [[ "$line" =~ ^[[:space:]]+[^[:space:]] ]] && [[ "$in_multiline" == true ]]; then
+            if [[ "$in_multiline" == true ]]; then
                 # Check if this is the closing parenthesis
-                [[ "$line" =~ \) ]] && in_multiline=false
+                if [[ "$line" =~ \) ]]; then
+                    in_multiline=false
+                fi
                 continue
             fi
             
@@ -925,17 +927,37 @@ bind.list_records() {
                 continue
             fi
             
-            # Parse DNS records (flexible whitespace, matches "name IN TYPE value" or "name TYPE value")
-            if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+(IN[[:space:]]+)?([A-Z]+)[[:space:]]+(.+)$ ]]; then
-                local name="${BASH_REMATCH[1]}"
-                local type="${BASH_REMATCH[3]}"
-                local value="${BASH_REMATCH[4]}"
-                
-                # Skip SOA records (zone metadata) and track multi-line
-                if [ "$type" == "SOA" ]; then
-                    [[ "$value" =~ \( ]] && in_multiline=true
-                    continue
-                fi
+            # Trim leading/trailing whitespace for easier parsing
+            line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            # Parse DNS records with multiple pattern attempts
+            local name type value
+            
+            # Try pattern 1: name IN TYPE value (most common)
+            if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+IN[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+                name="${BASH_REMATCH[1]}"
+                type="${BASH_REMATCH[2]}"
+                value="${BASH_REMATCH[3]}"
+            # Try pattern 2: name TYPE value (no IN keyword)
+            elif [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+                name="${BASH_REMATCH[1]}"
+                type="${BASH_REMATCH[2]}"
+                value="${BASH_REMATCH[3]}"
+            else
+                # Doesn't match any pattern, skip
+                continue
+            fi
+            
+            # Skip SOA and NS records at zone level (zone metadata)
+            if [ "$type" == "SOA" ]; then
+                [[ "$value" =~ \( ]] && in_multiline=true
+                continue
+            fi
+            
+            # Skip zone-level NS records (no name or @ name)
+            if [ "$type" == "NS" ] && { [ "$name" == "@" ] || [ "$name" == "$d" ]; }; then
+                continue
+            fi
                 
                 # Filter by record type if specified
                 if [ -n "$record_type" ] && [ "$type" != "$record_type" ]; then
