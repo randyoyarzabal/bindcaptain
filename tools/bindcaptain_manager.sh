@@ -984,7 +984,7 @@ bind.list_records() {
             value="${value%.}"
             
             printf "%-45s ${GREEN}%-8s${NC} %s\n" "$fqdn" "$type" "$value"
-            ((count++))
+            count=$((count + 1))
         done < "$zone_file"
         
         echo
