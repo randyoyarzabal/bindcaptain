@@ -346,9 +346,10 @@ bind.create_record() {
     if grep -q "^${hostname}\s" "$zone_file"; then
         print_status "warning" "Record $hostname already exists in $domain"
         
-        # In non-interactive mode, automatically overwrite
+        # In non-interactive mode, fail rather than overwrite
         if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
-            print_status "info" "Non-interactive mode: overwriting existing record"
+            print_status "error" "Record already exists (use delete first, or run interactively to overwrite)"
+            return 1
         else
             read -p "Overwrite existing record? (y/N): " -n 1 -r
             echo
@@ -471,9 +472,10 @@ bind.create_cname() {
     if grep -q "^${alias}\s" "$zone_file"; then
         print_status "warning" "Record $alias already exists in $domain"
         
-        # In non-interactive mode, automatically overwrite
+        # In non-interactive mode, fail rather than overwrite
         if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
-            print_status "info" "Non-interactive mode: overwriting existing record"
+            print_status "error" "Record already exists (use delete first, or run interactively to overwrite)"
+            return 1
         else
             read -p "Overwrite existing record? (y/N): " -n 1 -r
             echo
@@ -699,7 +701,7 @@ bind.delete_record() {
     grep "$search_pattern" "$zone_file"
     echo
     
-    # In non-interactive mode, automatically delete
+    # In non-interactive mode, delete without prompting (delete is explicit action)
     if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
         print_status "info" "Non-interactive mode: deleting records"
     else
