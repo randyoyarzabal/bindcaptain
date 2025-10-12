@@ -70,6 +70,34 @@ log_action() {
     log_message "$1" "$LOG_FILE"
 }
 
+# Parse FQDN to extract hostname and domain
+# Usage: parse_fqdn "webserver.homelab.io" 
+# Returns: hostname domain (space separated)
+parse_fqdn() {
+    local input="$1"
+    
+    # If no dot, return as-is (just hostname)
+    if [[ ! "$input" =~ \. ]]; then
+        echo "$input"
+        return 0
+    fi
+    
+    # Try to match against configured domains
+    for domain in "${DOMAINS[@]}"; do
+        if [[ "$input" == *".$domain" ]]; then
+            local hostname="${input%.$domain}"
+            echo "$hostname $domain"
+            return 0
+        fi
+    done
+    
+    # If no match, try to split on first dot
+    local hostname="${input%%.*}"
+    local domain="${input#*.}"
+    echo "$hostname $domain"
+    return 0
+}
+
 # Custom header for this script
 print_manager_header() {
     print_header "BIND DNS Management Tool" "(Container-aware)"
@@ -285,13 +313,15 @@ bind.create_record() {
         esac
     done
     
-    if [ "$show_help" = true ] || [ $# -lt 3 ]; then
+    if [ "$show_help" = true ] || [ $# -lt 2 ]; then
         echo -e "${WHITE}bind.create_record${NC} - Create DNS A record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.create_record <fqdn> <ip_address> [ttl]"
         echo "  bind.create_record <hostname> <domain> <ip_address> [ttl]"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
+        echo -e "  ${GREEN}fqdn${NC}       - Fully qualified domain name (e.g., webserver.homelab.io)"
         echo -e "  ${GREEN}hostname${NC}   - Host name (without domain)"
         echo -e "  ${GREEN}domain${NC}     - Domain name (from: ${DOMAINS[*]:-auto-discovered})"
         echo -e "  ${GREEN}ip_address${NC} - IPv4 address"
@@ -303,14 +333,34 @@ bind.create_record() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.create_record webserver.${DOMAINS[0]:-example.com} 172.25.50.100"
         echo "  bind.create_record webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
         return 0
     fi
     
-    local hostname=$1
-    local domain=$2
-    local ip_address=$3
-    local ttl=${4:-$DEFAULT_TTL}
+    # Parse arguments - support both FQDN and hostname+domain formats
+    local hostname domain ip_address ttl
+    if [ $# -eq 2 ] || [ $# -eq 3 ]; then
+        # FQDN format: <fqdn> <ip> [ttl]
+        read hostname domain <<< $(parse_fqdn "$1")
+        ip_address=$2
+        ttl=${3:-$DEFAULT_TTL}
+        
+        # If domain wasn't extracted, treat first arg as hostname and fail
+        if [ -z "$domain" ]; then
+            print_status "error" "Could not parse domain from '$1'. Available domains: ${DOMAINS[*]}"
+            return 1
+        fi
+    elif [ $# -ge 3 ]; then
+        # Traditional format: <hostname> <domain> <ip> [ttl]
+        hostname=$1
+        domain=$2
+        ip_address=$3
+        ttl=${4:-$DEFAULT_TTL}
+    else
+        print_status "error" "Invalid arguments. Use --help for usage."
+        return 1
+    fi
     
     print_manager_header
     echo -e "${WHITE}Creating A Record${NC}"
@@ -418,13 +468,15 @@ bind.create_cname() {
         esac
     done
     
-    if [ "$show_help" = true ] || [ $# -lt 3 ]; then
+    if [ "$show_help" = true ] || [ $# -lt 2 ]; then
         echo -e "${WHITE}bind.create_cname${NC} - Create DNS CNAME record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.create_cname <fqdn> <target>"
         echo "  bind.create_cname <alias> <domain> <target>"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
+        echo -e "  ${GREEN}fqdn${NC}       - Fully qualified domain name for alias (e.g., www.homelab.io)"
         echo -e "  ${GREEN}alias${NC}      - Alias name (without domain)"
         echo -e "  ${GREEN}domain${NC}     - Domain name (from: ${DOMAINS[*]:-auto-discovered})"
         echo -e "  ${GREEN}target${NC}     - Target hostname (can include domain)"
@@ -435,14 +487,32 @@ bind.create_cname() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.create_cname www.${DOMAINS[0]:-example.com} webserver"
         echo "  bind.create_cname www ${DOMAINS[0]:-example.com} webserver"
-        echo "  bind.create_cname ftp ${DOMAINS[0]:-example.com} webserver.${DOMAINS[0]:-example.com}."
         return 0
     fi
     
-    local alias=$1
-    local domain=$2
-    local target=$3
+    # Parse arguments - support both FQDN and alias+domain formats
+    local alias domain target
+    if [ $# -eq 2 ]; then
+        # FQDN format: <fqdn> <target>
+        read alias domain <<< $(parse_fqdn "$1")
+        target=$2
+        
+        # If domain wasn't extracted, treat first arg as alias and fail
+        if [ -z "$domain" ]; then
+            print_status "error" "Could not parse domain from '$1'. Available domains: ${DOMAINS[*]}"
+            return 1
+        fi
+    elif [ $# -eq 3 ]; then
+        # Traditional format: <alias> <domain> <target>
+        alias=$1
+        domain=$2
+        target=$3
+    else
+        print_status "error" "Invalid arguments. Use --help for usage."
+        return 1
+    fi
     
     print_manager_header
     echo -e "${WHITE}Creating CNAME Record${NC}"
@@ -635,13 +705,15 @@ bind.delete_record() {
         esac
     done
     
-    if [ "$show_help" = true ] || [ $# -lt 2 ]; then
+    if [ "$show_help" = true ] || [ $# -lt 1 ]; then
         echo -e "${WHITE}bind.delete_record${NC} - Delete DNS record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
+        echo "  bind.delete_record <fqdn> [record_type]"
         echo "  bind.delete_record <name> <domain> [record_type]"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
+        echo -e "  ${GREEN}fqdn${NC}        - Fully qualified domain name (e.g., webserver.homelab.io)"
         echo -e "  ${GREEN}name${NC}        - Record name (without domain)"
         echo -e "  ${GREEN}domain${NC}      - Domain name (from: ${DOMAINS[*]:-auto-discovered})"
         echo -e "  ${GREEN}record_type${NC} - Record type (A, CNAME, TXT, etc) - optional"
@@ -652,14 +724,33 @@ bind.delete_record() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
+        echo "  bind.delete_record webserver.${DOMAINS[0]:-example.com}"
         echo "  bind.delete_record webserver ${DOMAINS[0]:-example.com}"
-        echo "  bind.delete_record www ${DOMAINS[0]:-example.com} CNAME"
+        echo "  bind.delete_record www.${DOMAINS[0]:-example.com} CNAME"
         return 0
     fi
     
-    local name=$1
-    local domain=$2
-    local record_type=${3:-""}
+    # Parse arguments - support both FQDN and name+domain formats
+    local name domain record_type
+    if [ $# -eq 1 ] || ( [ $# -eq 2 ] && [[ "$2" =~ ^[A-Z]+$ ]] ); then
+        # FQDN format: <fqdn> [record_type]
+        read name domain <<< $(parse_fqdn "$1")
+        record_type=${2:-""}
+        
+        # If domain wasn't extracted, treat first arg as name and fail
+        if [ -z "$domain" ]; then
+            print_status "error" "Could not parse domain from '$1'. Available domains: ${DOMAINS[*]}"
+            return 1
+        fi
+    elif [ $# -ge 2 ]; then
+        # Traditional format: <name> <domain> [record_type]
+        name=$1
+        domain=$2
+        record_type=${3:-""}
+    else
+        print_status "error" "Invalid arguments. Use --help for usage."
+        return 1
+    fi
     
     print_manager_header
     echo -e "${WHITE}Deleting DNS Record${NC}"
