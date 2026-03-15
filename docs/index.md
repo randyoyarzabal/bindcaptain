@@ -17,6 +17,7 @@ Welcome to **BindCaptain** - Take command of your DNS infrastructure with captai
 - [Container Management](container-management.md) - Building, running, and managing containers
 - [DNS Operations](dns-operations.md) - Creating, updating, and managing DNS records
 - [Systemd Integration](systemd-service.md) - Service management and automation
+- [Chief Remote Plugin](chief-remote-plugin.md) - Optional: control BindCaptain remotely via Chief over SSH
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
 
 ### Advanced Topics
@@ -135,6 +136,9 @@ bc.delete_record webserver example.com
 ```text
 bindcaptain/
 ├── bindcaptain.sh              # Main container management script
+├── chief-plugin/               # Optional Chief plugin for remote control
+│   ├── bc_chief-plugin.sh     # Source in Chief to control remote BindCaptain
+│   └── README.md
 ├── tools/                      # Management and setup tools
 │   ├── common.sh              # Shared utilities library
 │   ├── system-setup.sh        # System preparation (supported distros)
@@ -157,8 +161,8 @@ sudo ./bindcaptain.sh status    # Check status
 # DNS management
 source ./tools/bindcaptain_manager.sh
 bc.create_record --help       # Show help
-bind.list_zones                 # List all zones
-bind.refresh                    # Reload BIND configuration
+bc.list_records               # List records
+./tools/bindcaptain_manager.sh refresh   # Reload BIND configuration
 
 # System management
 sudo ./tools/system-setup.sh    # One-time system setup
