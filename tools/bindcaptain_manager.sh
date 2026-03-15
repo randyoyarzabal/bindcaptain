@@ -1207,6 +1207,11 @@ check_zones() {
     return $errors
 }
 
+# When sourced, show load message (skip when run as script)
+if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
+    echo "⚓ BindCaptain DNS Manager loaded. Type 'bc.help' for usage."
+fi
+
 # Direct command line interface
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     case "${1:-help}" in
