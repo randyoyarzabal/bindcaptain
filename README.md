@@ -85,12 +85,12 @@ sudo ./bindcaptain.sh start|stop|restart|service-status
 sudo bash -c "source /opt/bindcaptain/tools/bindcaptain_manager.sh"
 
 # Add records
-bind.create_record webserver yourdomain.com 192.168.1.100
-bind.create_cname www yourdomain.com webserver
-bind.create_txt @ yourdomain.com "v=spf1 -all"
+bc.create_record webserver yourdomain.com 192.168.1.100
+bc.create_cname www yourdomain.com webserver
+bc.create_txt @ yourdomain.com "v=spf1 -all"
 
 # List records
-bind.list_records yourdomain.com
+bc.list_records yourdomain.com
 ```
 
 > **Advanced DNS operations?** See [DNS Operations Guide](docs/dns-operations.md) for comprehensive record management and zone configuration.
@@ -105,7 +105,7 @@ sudo ./bindcaptain.sh build|run|stop|restart|logs|status
 sudo ./bindcaptain.sh install|uninstall|enable|disable|start|stop-service
 
 # DNS Management
-bind.create_record|create_cname|create_txt|delete_record|list_records
+bc.create_record|bc.create_cname|bc.create_txt|bc.delete_record|bc.list_records
 ```
 
 > **Complete command reference?** See [Cheat Sheet](docs/cheat-sheet.md) for all available commands and examples.

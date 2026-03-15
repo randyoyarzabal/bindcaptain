@@ -7,32 +7,32 @@
 # USAGE:
 #   # As a library (recommended for interactive use)
 #   source ./tools/bindcaptain_manager.sh
-#   bind.create_record webserver example.com 192.168.1.100
+#   bc.create_record webserver example.com 192.168.1.100
 #
 #   # As a direct command
 #   sudo ./tools/bindcaptain_manager.sh refresh
 #
 # FUNCTIONS:
-#   bind.create_record    - Create DNS A record
-#   bind.create_cname     - Create DNS CNAME record
-#   bind.create_txt       - Create DNS TXT record
-#   bind.delete_record    - Delete DNS record
-#   bind.list_records     - List DNS records
+#   bc.create_record    - Create DNS A record
+#   bc.create_cname     - Create DNS CNAME record
+#   bc.create_txt       - Create DNS TXT record
+#   bc.delete_record    - Delete DNS record
+#   bc.list_records     - List DNS records
 #   refresh               - Refresh and validate DNS configuration
 #   show_environment      - Show environment information
 #
 # EXAMPLES:
 #   # Create A record
-#   bind.create_record webserver example.com 192.168.1.100
+#   bc.create_record webserver example.com 192.168.1.100
 #
 #   # Create CNAME record
-#   bind.create_cname www example.com webserver
+#   bc.create_cname www example.com webserver
 #
 #   # Create TXT record
-#   bind.create_txt @ example.com "v=spf1 -all"
+#   bc.create_txt @ example.com "v=spf1 -all"
 #
 #   # List all records
-#   bind.list_records
+#   bc.list_records
 #
 #   # Refresh DNS configuration
 #   ./tools/bindcaptain_manager.sh refresh
@@ -52,8 +52,27 @@
 
 set -e
 
-# Load common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve script path so sourcing works when invoked via symlink (e.g. chief.plugin).
+# Otherwise SCRIPT_DIR points to the symlink's directory and source of common.sh fails, exiting the shell.
+_resolve_script_path() {
+    local path="$1"
+    while [ -L "$path" ]; do
+        local dir
+        dir="$(dirname "$path")"
+        local link
+        link="$(readlink "$path")"
+        if [[ "$link" = /* ]]; then
+            path="$link"
+        else
+            path="$dir/$link"
+        fi
+    done
+    echo "$path"
+}
+
+# Load common utilities (use resolved path so symlinked source finds common.sh)
+SCRIPT_SOURCE="$(_resolve_script_path "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 # Manager-specific configuration
@@ -303,8 +322,8 @@ create_ptr_record() {
     return 1
 }
 
-# Function: bind.create_record
-bind.create_record() {
+# Function: bc.create_record
+bc.create_record() {
     local show_help=false
     
     # Parse arguments
@@ -325,11 +344,11 @@ bind.create_record() {
     done
     
     if [ "$show_help" = true ] || [ $# -lt 2 ]; then
-        echo -e "${WHITE}bind.create_record${NC} - Create DNS A record"
+        echo -e "${WHITE}bc.create_record${NC} - Create DNS A record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.create_record [--backup] <fqdn> <ip_address> [ttl]"
-        echo "  bind.create_record [--backup] <hostname> <domain> <ip_address> [ttl]"
+        echo "  bc.create_record [--backup] <fqdn> <ip_address> [ttl]"
+        echo "  bc.create_record [--backup] <hostname> <domain> <ip_address> [ttl]"
         echo
         echo -e "${YELLOW}Options:${NC}"
         echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
@@ -347,9 +366,9 @@ bind.create_record() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
-        echo "  bind.create_record webserver.${DOMAINS[0]:-example.com} 172.25.50.100"
-        echo "  bind.create_record webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
-        echo "  bind.create_record --backup webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
+        echo "  bc.create_record webserver.${DOMAINS[0]:-example.com} 172.25.50.100"
+        echo "  bc.create_record webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
+        echo "  bc.create_record --backup webserver ${DOMAINS[0]:-example.com} 172.25.50.100"
         return 0
     fi
     
@@ -466,8 +485,8 @@ bind.create_record() {
     fi
 }
 
-# Function: bind.create_cname
-bind.create_cname() {
+# Function: bc.create_cname
+bc.create_cname() {
     local show_help=false
     
     # Parse arguments
@@ -488,11 +507,11 @@ bind.create_cname() {
     done
     
     if [ "$show_help" = true ] || [ $# -lt 2 ]; then
-        echo -e "${WHITE}bind.create_cname${NC} - Create DNS CNAME record"
+        echo -e "${WHITE}bc.create_cname${NC} - Create DNS CNAME record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.create_cname [--backup] <fqdn> <target>"
-        echo "  bind.create_cname [--backup] <alias> <domain> <target>"
+        echo "  bc.create_cname [--backup] <fqdn> <target>"
+        echo "  bc.create_cname [--backup] <alias> <domain> <target>"
         echo
         echo -e "${YELLOW}Options:${NC}"
         echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
@@ -509,9 +528,9 @@ bind.create_cname() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
-        echo "  bind.create_cname www.${DOMAINS[0]:-example.com} webserver"
-        echo "  bind.create_cname www ${DOMAINS[0]:-example.com} webserver"
-        echo "  bind.create_cname --backup www ${DOMAINS[0]:-example.com} webserver"
+        echo "  bc.create_cname www.${DOMAINS[0]:-example.com} webserver"
+        echo "  bc.create_cname www ${DOMAINS[0]:-example.com} webserver"
+        echo "  bc.create_cname --backup www ${DOMAINS[0]:-example.com} webserver"
         return 0
     fi
     
@@ -616,8 +635,8 @@ bind.create_cname() {
     fi
 }
 
-# Function: bind.create_txt
-bind.create_txt() {
+# Function: bc.create_txt
+bc.create_txt() {
     local show_help=false
     
     # Parse arguments
@@ -638,10 +657,10 @@ bind.create_txt() {
     done
     
     if [ "$show_help" = true ] || [ $# -lt 3 ]; then
-        echo -e "${WHITE}bind.create_txt${NC} - Create DNS TXT record"
+        echo -e "${WHITE}bc.create_txt${NC} - Create DNS TXT record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.create_txt [--backup] <name> <domain> <text_value>"
+        echo "  bc.create_txt [--backup] <name> <domain> <text_value>"
         echo
         echo -e "${YELLOW}Options:${NC}"
         echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
@@ -657,9 +676,9 @@ bind.create_txt() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
-        echo "  bind.create_txt @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
-        echo "  bind.create_txt _dmarc ${DOMAINS[0]:-example.com} 'v=DMARC1; p=none'"
-        echo "  bind.create_txt --backup @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
+        echo "  bc.create_txt @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
+        echo "  bc.create_txt _dmarc ${DOMAINS[0]:-example.com} 'v=DMARC1; p=none'"
+        echo "  bc.create_txt --backup @ ${DOMAINS[0]:-example.com} 'v=spf1 include:_spf.google.com ~all'"
         return 0
     fi
     
@@ -719,8 +738,8 @@ bind.create_txt() {
     fi
 }
 
-# Function: bind.delete_record
-bind.delete_record() {
+# Function: bc.delete_record
+bc.delete_record() {
     local show_help=false
     
     # Parse arguments
@@ -741,11 +760,11 @@ bind.delete_record() {
     done
     
     if [ "$show_help" = true ] || [ $# -lt 1 ]; then
-        echo -e "${WHITE}bind.delete_record${NC} - Delete DNS record"
+        echo -e "${WHITE}bc.delete_record${NC} - Delete DNS record"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.delete_record [--backup] <fqdn> [record_type]"
-        echo "  bind.delete_record [--backup] <name> <domain> [record_type]"
+        echo "  bc.delete_record [--backup] <fqdn> [record_type]"
+        echo "  bc.delete_record [--backup] <name> <domain> [record_type]"
         echo
         echo -e "${YELLOW}Options:${NC}"
         echo -e "  ${GREEN}--backup${NC}   - Create backup before modification (disabled by default)"
@@ -762,10 +781,10 @@ bind.delete_record() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
-        echo "  bind.delete_record webserver.${DOMAINS[0]:-example.com}"
-        echo "  bind.delete_record webserver ${DOMAINS[0]:-example.com}"
-        echo "  bind.delete_record www.${DOMAINS[0]:-example.com} CNAME"
-        echo "  bind.delete_record --backup webserver ${DOMAINS[0]:-example.com}"
+        echo "  bc.delete_record webserver.${DOMAINS[0]:-example.com}"
+        echo "  bc.delete_record webserver ${DOMAINS[0]:-example.com}"
+        echo "  bc.delete_record www.${DOMAINS[0]:-example.com} CNAME"
+        echo "  bc.delete_record --backup webserver ${DOMAINS[0]:-example.com}"
         return 0
     fi
     
@@ -868,8 +887,8 @@ bind.delete_record() {
     fi
 }
 
-# Function: bind.list_records
-bind.list_records() {
+# Function: bc.list_records
+bc.list_records() {
     local show_help=false
     
     # Parse arguments
@@ -886,10 +905,10 @@ bind.list_records() {
     done
     
     if [ "$show_help" = true ]; then
-        echo -e "${WHITE}bind.list_records${NC} - List DNS records"
+        echo -e "${WHITE}bc.list_records${NC} - List DNS records"
         echo
         echo -e "${YELLOW}Usage:${NC}"
-        echo "  bind.list_records [domain] [record_type]"
+        echo "  bc.list_records [domain] [record_type]"
         echo
         echo -e "${YELLOW}Parameters:${NC}"
         echo -e "  ${GREEN}domain${NC}      - Domain name (optional, shows all if not specified)"
@@ -901,9 +920,9 @@ bind.list_records() {
         done
         echo
         echo -e "${YELLOW}Examples:${NC}"
-        echo "  bind.list_records"
-        echo "  bind.list_records ${DOMAINS[0]:-example.com}"
-        echo "  bind.list_records ${DOMAINS[0]:-example.com} A"
+        echo "  bc.list_records"
+        echo "  bc.list_records ${DOMAINS[0]:-example.com}"
+        echo "  bc.list_records ${DOMAINS[0]:-example.com} A"
         return 0
     fi
     
@@ -1061,20 +1080,20 @@ main() {
     
     # Route to appropriate function
     case "${FUNCNAME[1]}" in
-        bind.create_record)
-            bind.create_record "$@"
+        bc.create_record)
+            bc.create_record "$@"
             ;;
-        bind.create_cname)
-            bind.create_cname "$@"
+        bc.create_cname)
+            bc.create_cname "$@"
             ;;
-        bind.create_txt)
-            bind.create_txt "$@"
+        bc.create_txt)
+            bc.create_txt "$@"
             ;;
-            bind.delete_record)
-                bind.delete_record "$@"
+            bc.delete_record)
+                bc.delete_record "$@"
                 ;;
-            bind.list_records)
-                bind.list_records "$@"
+            bc.list_records)
+                bc.list_records "$@"
                 ;;
             show_environment)
                 show_environment "$@"
@@ -1086,24 +1105,24 @@ main() {
             print_manager_header
             echo -e "${WHITE}Available Commands:${NC}"
             echo
-                echo -e "  ${GREEN}bind.create_record${NC}  - Create DNS A record"
-                echo -e "  ${GREEN}bind.create_cname${NC}   - Create DNS CNAME record"
-                echo -e "  ${GREEN}bind.create_txt${NC}     - Create DNS TXT record"
-                echo -e "  ${GREEN}bind.delete_record${NC}  - Delete DNS record"
-                echo -e "  ${GREEN}bind.list_records${NC}   - List DNS records"
+                echo -e "  ${GREEN}bc.create_record${NC}  - Create DNS A record"
+                echo -e "  ${GREEN}bc.create_cname${NC}   - Create DNS CNAME record"
+                echo -e "  ${GREEN}bc.create_txt${NC}     - Create DNS TXT record"
+                echo -e "  ${GREEN}bc.delete_record${NC}  - Delete DNS record"
+                echo -e "  ${GREEN}bc.list_records${NC}   - List DNS records"
                 echo -e "  ${GREEN}refresh${NC}             - Refresh and validate DNS configuration"
                 echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
             echo
             echo -e "${YELLOW}Usage:${NC}"
             echo "  source $0"
-            echo "  bind.create_record --help"
+            echo "  bc.create_record --help"
             echo "  show_environment"
             echo
             echo -e "${YELLOW}Example:${NC}"
             if [ ${#DOMAINS[@]} -gt 0 ]; then
-                echo "  bind.create_record webserver ${DOMAINS[0]} 172.25.50.100"
+                echo "  bc.create_record webserver ${DOMAINS[0]} 172.25.50.100"
             else
-                echo "  bind.create_record webserver example.com 172.25.50.100"
+                echo "  bc.create_record webserver example.com 172.25.50.100"
             fi
             ;;
     esac
@@ -1206,7 +1225,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
             echo
             echo "For interactive DNS management, source this script:"
             echo "  source $0"
-            echo "  bind.create_record --help"
+            echo "  bc.create_record --help"
             ;;
         *)
             print_manager_header

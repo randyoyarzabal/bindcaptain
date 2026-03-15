@@ -77,66 +77,66 @@ sudo ./bindcaptain.sh build
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh"
 
 # Or call functions directly
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && bind.create_record --help"
+sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && bc.create_record --help"
 ```
 
 ### Adding A Records
 ```bash
-# Syntax: bind.create_record <hostname> <domain> <ip_address> [ttl]
+# Syntax: bc.create_record <hostname> <domain> <ip_address> [ttl]
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_record newserver example.com 192.168.1.100"
+    bc.create_record newserver example.com 192.168.1.100"
 
 # With custom TTL
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_record webserver example.com 192.168.1.200 3600"
+    bc.create_record webserver example.com 192.168.1.200 3600"
 ```
 
 ### Adding CNAME Records
 ```bash
-# Syntax: bind.create_cname <alias> <domain> <target>
+# Syntax: bc.create_cname <alias> <domain> <target>
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_cname www example.com newserver"
+    bc.create_cname www example.com newserver"
 
 # Point to external domain
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_cname ftp example.com newserver.example.com."
+    bc.create_cname ftp example.com newserver.example.com."
 ```
 
 ### Adding TXT Records
 ```bash
-# Syntax: bind.create_txt <name> <domain> <text_value>
+# Syntax: bc.create_txt <name> <domain> <text_value>
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_txt @ example.com 'v=spf1 include:_spf.google.com ~all'"
+    bc.create_txt @ example.com 'v=spf1 include:_spf.google.com ~all'"
 
 # DMARC record
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_txt _dmarc example.com 'v=DMARC1; p=none'"
+    bc.create_txt _dmarc example.com 'v=DMARC1; p=none'"
 ```
 
 ### Deleting Records
 ```bash
-# Syntax: bind.delete_record <name> <domain> [record_type]
+# Syntax: bc.delete_record <name> <domain> [record_type]
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.delete_record oldserver example.com"
+    bc.delete_record oldserver example.com"
 
 # Delete specific record type
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.delete_record www example.com CNAME"
+    bc.delete_record www example.com CNAME"
 ```
 
 ### Viewing Records
 ```bash
 # List all records for all domains
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.list_records"
+    bc.list_records"
 
 # List records for specific domain
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.list_records example.com"
+    bc.list_records example.com"
 
 # List specific record type
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.list_records example.com A"
+    bc.list_records example.com A"
 ```
 
 ### **Auto-Management Features**
@@ -284,7 +284,7 @@ sudo podman exec bindcaptain tail -f /var/log/named/named.log
 
 ```bash
 # PTR records are created inline - no separate commands needed
-bind.create_record hostname domain.com 192.168.1.100
+bc.create_record hostname domain.com 192.168.1.100
 # ↑ Creates both A record AND PTR record automatically
 
 # Legacy refresh script still available for manual validation

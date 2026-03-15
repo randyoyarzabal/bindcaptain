@@ -82,7 +82,7 @@ source ./tools/bindcaptain_manager.sh
 Create your first DNS record:
 
 ```bash
-bind.create_record webserver example.com 192.168.1.100
+bc.create_record webserver example.com 192.168.1.100
 ```
 
 ## Next Steps
@@ -102,9 +102,9 @@ sudo ./bindcaptain.sh status   # Check status
 
 # DNS management
 source ./tools/bindcaptain_manager.sh
-bind.create_record host domain.com 192.168.1.100
-bind.list_records domain.com
-bind.delete_record host domain.com
+bc.create_record host domain.com 192.168.1.100
+bc.list_records domain.com
+bc.delete_record host domain.com
 ```
 
 ## Troubleshooting

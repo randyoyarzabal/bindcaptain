@@ -71,7 +71,7 @@ sudo ./bindcaptain.sh run
 
 # 5. Manage DNS records
 source ./tools/bindcaptain_manager.sh
-bind.create_record webserver example.com 192.168.1.100
+bc.create_record webserver example.com 192.168.1.100
 ```
 
 ### Manual Setup (Unsupported Distributions)
@@ -95,13 +95,13 @@ sudo ./bindcaptain.sh run
 source ./tools/bindcaptain_manager.sh
 
 # Create DNS records
-bind.create_record webserver example.com 192.168.1.100
-bind.create_record mail example.com 192.168.1.101
-bind.create_cname www example.com webserver.example.com
+bc.create_record webserver example.com 192.168.1.100
+bc.create_record mail example.com 192.168.1.101
+bc.create_cname www example.com webserver.example.com
 
 # List and manage records
-bind.list_records example.com
-bind.delete_record webserver example.com
+bc.list_records example.com
+bc.delete_record webserver example.com
 
 # Refresh DNS
 ./tools/bindcaptain_manager.sh refresh
@@ -156,7 +156,7 @@ sudo ./bindcaptain.sh status    # Check status
 
 # DNS management
 source ./tools/bindcaptain_manager.sh
-bind.create_record --help       # Show help
+bc.create_record --help       # Show help
 bind.list_zones                 # List all zones
 bind.refresh                    # Reload BIND configuration
 

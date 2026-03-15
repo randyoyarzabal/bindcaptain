@@ -214,7 +214,7 @@ source ./tools/bindcaptain_manager.sh
 Create your first DNS record:
 
 ```bash
-bind.create_record webserver example.com 192.168.1.100
+bc.create_record webserver example.com 192.168.1.100
 ```
 
 ### Monitoring Setup

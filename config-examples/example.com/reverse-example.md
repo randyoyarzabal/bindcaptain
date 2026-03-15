@@ -15,4 +15,4 @@ Reverse zones enable reverse DNS lookups (IP to hostname resolution) which are:
 - Best practice for professional DNS implementations
 
 ## Automated Generation:
-PTR records are automatically created when A records are added using `bind.create_record`. No external tools or cron jobs are required - reverse DNS is handled inline for immediate consistency.
+PTR records are automatically created when A records are added using `bc.create_record`. No external tools or cron jobs are required - reverse DNS is handled inline for immediate consistency.

@@ -108,7 +108,7 @@ sudo ./bindcaptain.sh run
 
 # 4. Manage DNS records
 source ./tools/bindcaptain_manager.sh
-bind.create_record webserver example.com 192.168.1.100
+bc.create_record webserver example.com 192.168.1.100
 
 # 5. Refresh/maintenance
 ./tools/bindcaptain_manager.sh refresh
@@ -124,7 +124,7 @@ sudo ./tools/config-setup.sh wizard
 
 # DNS management only
 source ./tools/bindcaptain_manager.sh
-bind.create_record --help
+bc.create_record --help
 
 # Refresh/maintenance only
 ./tools/bindcaptain_manager.sh refresh

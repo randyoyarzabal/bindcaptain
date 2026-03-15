@@ -19,9 +19,9 @@ source ./tools/bindcaptain_manager.sh
 
 After sourcing, you get access to:
 
-- `bind.create_record` - Create DNS records
-- `bind.delete_record` - Delete DNS records
-- `bind.list_records` - List DNS records
+- `bc.create_record` - Create DNS records
+- `bc.delete_record` - Delete DNS records
+- `bc.list_records` - List DNS records
 - `bind.list_zones` - List all zones
 - `bind.refresh` - Reload BIND configuration
 - `bind.validate` - Validate DNS configuration
@@ -32,34 +32,34 @@ After sourcing, you get access to:
 
 ```bash
 # Create A record
-bind.create_record webserver example.com 192.168.1.100
+bc.create_record webserver example.com 192.168.1.100
 
 # Create A record with TTL
-bind.create_record mail example.com 192.168.1.101 3600
+bc.create_record mail example.com 192.168.1.101 3600
 
 # Create multiple A records
-bind.create_record web1 example.com 192.168.1.100
-bind.create_record web2 example.com 192.168.1.101
+bc.create_record web1 example.com 192.168.1.100
+bc.create_record web2 example.com 192.168.1.101
 ```
 
 ### CNAME Records (Aliases)
 
 ```bash
 # Create CNAME record
-bind.create_cname www example.com webserver.example.com
+bc.create_cname www example.com webserver.example.com
 
 # Create CNAME with TTL
-bind.create_cname ftp example.com fileserver.example.com 7200
+bc.create_cname ftp example.com fileserver.example.com 7200
 ```
 
 ### TXT Records (Text Records)
 
 ```bash
 # Create TXT record
-bind.create_txt _dmarc example.com "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+bc.create_txt _dmarc example.com "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
 
 # Create SPF record
-bind.create_txt example.com example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
+bc.create_txt example.com example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
 ```
 
 ### PTR Records (Reverse DNS)
@@ -78,37 +78,37 @@ bind.create_ptr 101 1.168.192.in-addr.arpa mail.example.com 3600
 
 ```bash
 # List all records in a zone
-bind.list_records example.com
+bc.list_records example.com
 
 # List specific record type
-bind.list_records example.com A
-bind.list_records example.com CNAME
-bind.list_records example.com TXT
+bc.list_records example.com A
+bc.list_records example.com CNAME
+bc.list_records example.com TXT
 ```
 
 ### Deleting Records
 
 ```bash
 # Delete A record
-bind.delete_record webserver example.com
+bc.delete_record webserver example.com
 
 # Delete CNAME record
-bind.delete_record www example.com
+bc.delete_record www example.com
 
 # Delete TXT record
-bind.delete_record _dmarc example.com
+bc.delete_record _dmarc example.com
 ```
 
 ### Updating Records
 
 ```bash
 # Update A record (delete and recreate)
-bind.delete_record webserver example.com
-bind.create_record webserver example.com 192.168.1.200
+bc.delete_record webserver example.com
+bc.create_record webserver example.com 192.168.1.200
 
 # Update with new TTL
-bind.delete_record mail example.com
-bind.create_record mail example.com 192.168.1.201 7200
+bc.delete_record mail example.com
+bc.create_record mail example.com 192.168.1.201 7200
 ```
 
 ## Zone Management
@@ -219,7 +219,7 @@ Interactive menu options:
 ```bash
 # Create multiple A records from file
 while read -r hostname ip; do
-    bind.create_record "$hostname" example.com "$ip"
+    bc.create_record "$hostname" example.com "$ip"
 done < hosts.txt
 ```
 
@@ -371,18 +371,18 @@ sudo podman exec bindcaptain tcpdump -i any port 53
 source ./tools/bindcaptain_manager.sh
 
 # Create main A records
-bind.create_record ns1 example.com 192.168.1.10
-bind.create_record ns2 example.com 192.168.1.11
-bind.create_record mail example.com 192.168.1.20
-bind.create_record web example.com 192.168.1.30
+bc.create_record ns1 example.com 192.168.1.10
+bc.create_record ns2 example.com 192.168.1.11
+bc.create_record mail example.com 192.168.1.20
+bc.create_record web example.com 192.168.1.30
 
 # Create CNAME records
-bind.create_cname www example.com web.example.com
-bind.create_cname ftp example.com web.example.com
+bc.create_cname www example.com web.example.com
+bc.create_cname ftp example.com web.example.com
 
 # Create TXT records
-bind.create_txt example.com example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
-bind.create_txt _dmarc example.com "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+bc.create_txt example.com example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
+bc.create_txt _dmarc example.com "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
 
 # Create PTR records
 bind.create_ptr 10 1.168.192.in-addr.arpa ns1.example.com

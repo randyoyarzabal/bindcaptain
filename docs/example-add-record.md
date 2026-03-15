@@ -7,7 +7,7 @@
 ### Step 1: Add the A Record
 ```bash
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.create_record newserver example.com 192.168.1.200"
+    bc.create_record newserver example.com 192.168.1.200"
 ```
 
 Output will show:
@@ -35,7 +35,7 @@ dig @192.168.1.1 newserver.example.com +short
 
 # List all records to verify
 sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bind.list_records example.com"
+    bc.list_records example.com"
 ```
 
 ### Step 3: Check Reverse DNS (Auto-Generated)
