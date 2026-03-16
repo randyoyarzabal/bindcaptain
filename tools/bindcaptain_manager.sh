@@ -1073,6 +1073,34 @@ show_environment() {
     echo
 }
 
+# Function: bc.help
+bc.help() {
+    print_manager_header
+    echo -e "${WHITE}Available Commands:${NC}"
+    echo
+    echo -e "  ${GREEN}bc.create_record${NC}  - Create DNS A record"
+    echo -e "  ${GREEN}bc.create_cname${NC}   - Create DNS CNAME record"
+    echo -e "  ${GREEN}bc.create_txt${NC}     - Create DNS TXT record"
+    echo -e "  ${GREEN}bc.delete_record${NC}  - Delete DNS record"
+    echo -e "  ${GREEN}bc.list_records${NC}   - List DNS records"
+    echo -e "  ${GREEN}refresh${NC}             - Refresh and validate DNS configuration"
+    echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
+    echo -e "  ${GREEN}bc.help${NC}             - Show this help"
+    echo
+    echo -e "${YELLOW}Usage:${NC}"
+    echo "  bc.create_record --help   (and similarly for other commands)"
+    echo "  show_environment"
+    echo "  refresh                   (or: $0 refresh when run as script)"
+    echo
+    echo -e "${YELLOW}Example:${NC}"
+    if [ ${#DOMAINS[@]} -gt 0 ]; then
+        echo "  bc.create_record webserver ${DOMAINS[0]} 172.25.50.100"
+    else
+        echo "  bc.create_record webserver example.com 172.25.50.100"
+    fi
+    echo
+}
+
 # Main function to handle command routing
 main() {
     # Create log file if it doesn't exist
@@ -1096,9 +1124,12 @@ main() {
             bc.delete_record)
                 bc.delete_record "$@"
                 ;;
-            bc.list_records)
-                bc.list_records "$@"
-                ;;
+        bc.list_records)
+            bc.list_records "$@"
+            ;;
+        bc.help)
+            bc.help "$@"
+            ;;
             show_environment)
                 show_environment "$@"
                 ;;
