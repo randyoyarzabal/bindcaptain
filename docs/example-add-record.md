@@ -5,16 +5,25 @@
 ### **Using BindCaptain Manager (Recommended)**
 
 ### Step 1: Add the A Record
+
+Load the manager in your shell (if not already loaded via profile or Chief):
+
 ```bash
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_record newserver example.com 192.168.1.200"
+source /opt/bindcaptain/tools/bindcaptain_manager.sh   # when installed
+# or: source ./tools/bindcaptain_manager.sh            # from repo
+```
+
+Then run:
+
+```bash
+bc.create_record newserver example.com 192.168.1.200
 ```
 
 Output will show:
 ```
 ================================
-  BIND DNS Management Tool
-  (Container-aware)
+  ⚓ BindCaptain
+  (Container-aware DNS Management)
 ================================
 
 Creating A Record
@@ -34,8 +43,7 @@ dig @192.168.1.1 newserver.example.com +short
 # Should return: 192.168.1.200
 
 # List all records to verify
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.list_records example.com"
+bc.list_records example.com
 ```
 
 ### Step 3: Check Reverse DNS (Auto-Generated)

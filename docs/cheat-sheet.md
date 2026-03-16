@@ -22,8 +22,9 @@
 │   └── named.ca                     # Root hints file
 ├── logs/                            # Log files
 ├── bindcaptain.sh                   # Container management script
-├── bindcaptain_manager.sh           # DNS record management
-└── bindcaptain_refresh.sh           # Auto-refresh script (cron)
+├── tools/
+│   ├── bindcaptain_manager.sh       # DNS record management (bc.*)
+│   └── bindcaptain_refresh.sh       # Auto-refresh script (cron)
 ```
 
 ---
@@ -71,72 +72,71 @@ sudo ./bindcaptain.sh build
 
 **⚠ IMPORTANT:** Always use the BindCaptain manager functions - never edit zone files manually!
 
-### Using the Manager
-```bash
-# First, source the manager script
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh"
+### Loading the Manager
 
-# Or call functions directly
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && bc.create_record --help"
+Source the manager once per shell (or add to your shell profile on the DNS host):
+
+```bash
+# From repo directory
+source ./tools/bindcaptain_manager.sh
+
+# When installed (e.g. production)
+source /opt/bindcaptain/tools/bindcaptain_manager.sh
+```
+
+For remote use, load the [Chief bc plugin](../chief-plugin/README.md) instead; it runs these commands on the host via SSH. Then run `bc.*` commands in that shell (as root on the host, or via Chief from your workstation):
+
+```bash
+bc.create_record --help   # Show help for any bc.* command
+bc.help                   # List all commands
 ```
 
 ### Adding A Records
 ```bash
 # Syntax: bc.create_record <hostname> <domain> <ip_address> [ttl]
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_record newserver example.com 192.168.1.100"
+bc.create_record newserver example.com 192.168.1.100
 
 # With custom TTL
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_record webserver example.com 192.168.1.200 3600"
+bc.create_record webserver example.com 192.168.1.200 3600
 ```
 
 ### Adding CNAME Records
 ```bash
 # Syntax: bc.create_cname <alias> <domain> <target>
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_cname www example.com newserver"
+bc.create_cname www example.com newserver
 
 # Point to external domain
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_cname ftp example.com newserver.example.com."
+bc.create_cname ftp example.com newserver.example.com.
 ```
 
 ### Adding TXT Records
 ```bash
 # Syntax: bc.create_txt <name> <domain> <text_value>
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_txt @ example.com 'v=spf1 include:_spf.google.com ~all'"
+bc.create_txt @ example.com 'v=spf1 include:_spf.google.com ~all'
 
 # DMARC record
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.create_txt _dmarc example.com 'v=DMARC1; p=none'"
+bc.create_txt _dmarc example.com 'v=DMARC1; p=none'
 ```
 
 ### Deleting Records
 ```bash
 # Syntax: bc.delete_record <name> <domain> [record_type]
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.delete_record oldserver example.com"
+bc.delete_record oldserver example.com
 
 # Delete specific record type
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.delete_record www example.com CNAME"
+bc.delete_record www example.com CNAME
 ```
 
 ### Viewing Records
 ```bash
 # List all records for all domains
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.list_records"
+bc.list_records
 
 # List records for specific domain
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.list_records example.com"
+bc.list_records example.com
 
 # List specific record type
-sudo bash -c "source /opt/bindcaptain/bindcaptain_manager.sh && \
-    bc.list_records example.com A"
+bc.list_records example.com A
 ```
 
 ### **Auto-Management Features**

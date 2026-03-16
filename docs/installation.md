@@ -246,8 +246,9 @@ sudo ./bindcaptain.sh status
 # Validate configuration
 sudo ./bindcaptain.sh validate
 
-# Test DNS resolution
-./tools/bindcaptain_manager.sh test
+# Test DNS resolution (after container is running)
+./tools/bindcaptain_manager.sh help
+dig @localhost example.com
 ```
 
 ## Troubleshooting Installation

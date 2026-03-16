@@ -18,8 +18,9 @@
 #   bc.create_txt       - Create DNS TXT record
 #   bc.delete_record    - Delete DNS record
 #   bc.list_records     - List DNS records
-#   refresh               - Refresh and validate DNS configuration
-#   show_environment      - Show environment information
+#   bc.refresh           - Refresh and validate DNS configuration
+#   bc.show_environment  - Show environment information
+#   bc.help              - Show help
 #
 # EXAMPLES:
 #   # Create A record
@@ -58,7 +59,7 @@ fi
 
 # Resolve script path so sourcing works when invoked via symlink (e.g. chief.plugin).
 # Otherwise SCRIPT_DIR points to the symlink's directory and source of common.sh fails, exiting the shell.
-_resolve_script_path() {
+__resolve_script_path() {
     local path="$1"
     while [ -L "$path" ]; do
         local dir
@@ -75,7 +76,7 @@ _resolve_script_path() {
 }
 
 # Load common utilities (use resolved path so symlinked source finds common.sh)
-SCRIPT_SOURCE="$(_resolve_script_path "${BASH_SOURCE[0]}")"
+SCRIPT_SOURCE="$(__resolve_script_path "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
@@ -91,14 +92,14 @@ domains_output=$(discover_domains 2>/dev/null) && DOMAINS=($domains_output) || D
 DEFAULT_TTL="86400"
 
 # Manager-specific logging function
-log_action() {
+__log_action() {
     log_message "$1" "$LOG_FILE"
 }
 
 # Parse FQDN to extract hostname and domain
-# Usage: parse_fqdn "webserver.homelab.io" 
+# Usage: __parse_fqdn "webserver.homelab.io" 
 # Returns: hostname domain (space separated)
-parse_fqdn() {
+__parse_fqdn() {
     local input="$1"
     
     # If no dot, return as-is (just hostname)
@@ -124,12 +125,12 @@ parse_fqdn() {
 }
 
 # Custom header for this script
-print_manager_header() {
+__print_manager_header() {
     print_header "⚓ BindCaptain" "(Container-aware DNS Management)"
 }
 
 # Manager-specific domain validation (checks against discovered domains)
-validate_domain_in_config() {
+__validate_domain_in_config() {
     local domain=$1
     for valid_domain in "${DOMAINS[@]}"; do
         if [ "$domain" = "$valid_domain" ]; then
@@ -140,7 +141,7 @@ validate_domain_in_config() {
 }
 
 # Backup zone file
-backup_zone() {
+__backup_zone() {
     # Skip backup if disabled
     if [[ "$ENABLE_BACKUPS" != "true" ]]; then
         return 0
@@ -162,7 +163,7 @@ backup_zone() {
     
     if cp "$zone_file" "$backup_file"; then
         print_status "success" "Backed up $domain to $backup_file"
-        log_action "Backed up zone $domain"
+        __log_action "Backed up zone $domain"
         return 0
     else
         print_status "error" "Failed to backup $domain"
@@ -171,7 +172,7 @@ backup_zone() {
 }
 
 # Increment serial number
-increment_serial() {
+__increment_serial() {
     local zone_file=$1
     local current_serial=$(grep -E "^\s*[0-9]+\s*;\s*serial" "$zone_file" | awk '{print $1}')
     local new_serial
@@ -195,12 +196,12 @@ increment_serial() {
 }
 
 # Reload BIND (container-aware)
-reload_bind() {
+__reload_bind() {
     if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
         # Running inside container
         if systemctl reload named 2>/dev/null || /usr/sbin/rndc reload 2>/dev/null; then
             print_status "success" "BIND reloaded successfully"
-            log_action "BIND reloaded"
+            __log_action "BIND reloaded"
             return 0
         else
             print_status "error" "Failed to reload BIND"
@@ -211,14 +212,14 @@ reload_bind() {
         if command -v podman &> /dev/null; then
             if podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload 2>/dev/null; then
                 print_status "success" "BIND reloaded successfully (via container)"
-                log_action "BIND reloaded via container"
+                __log_action "BIND reloaded via container"
                 return 0
             else
                 print_status "warning" "rndc reload failed, attempting container restart..."
                 if podman restart "$CONTAINER_NAME" >/dev/null 2>&1; then
                     sleep 3  # Give container time to start
                     print_status "success" "BIND reloaded via container restart"
-                    log_action "BIND reloaded via container restart"
+                    __log_action "BIND reloaded via container restart"
                     return 0
                 else
                     print_status "error" "Failed to reload BIND via container"
@@ -233,7 +234,7 @@ reload_bind() {
 }
 
 # Validate zone file
-validate_zone() {
+__validate_zone() {
     local domain=$1
     local zone_file="$BIND_DIR/${domain}/${domain}.db"
     if [ ! -f "$zone_file" ]; then
@@ -275,7 +276,7 @@ validate_zone() {
 }
 
 # Create PTR record for given IP and hostname
-create_ptr_record() {
+__create_ptr_record() {
     local ip_address=$1
     local hostname=$2
     local domain=$3
@@ -310,10 +311,10 @@ create_ptr_record() {
                 echo "$ptr_record" >> "$reverse_file"
                 
                 # Increment serial number in reverse zone
-                increment_serial "$reverse_file"
+                __increment_serial "$reverse_file"
                 
                 print_status "success" "PTR record created: $ip_address -> ${hostname}.${domain}"
-                log_action "Created PTR record: $ip_address -> ${hostname}.${domain}"
+                __log_action "Created PTR record: $ip_address -> ${hostname}.${domain}"
                 return 0
             else
                 print_status "warning" "Reverse zone file not found: $reverse_file"
@@ -380,7 +381,7 @@ bc.create_record() {
     local hostname domain ip_address ttl
     if [ $# -eq 2 ] || [ $# -eq 3 ]; then
         # FQDN format: <fqdn> <ip> [ttl]
-        read hostname domain <<< $(parse_fqdn "$1")
+        read hostname domain <<< $(__parse_fqdn "$1")
         ip_address=$2
         ttl=${3:-$DEFAULT_TTL}
         
@@ -400,7 +401,7 @@ bc.create_record() {
         return 1
     fi
     
-    print_manager_header
+    __print_manager_header
     echo -e "${WHITE}Creating A Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Hostname: $hostname"
@@ -415,7 +416,7 @@ bc.create_record() {
         return 1
     fi
     
-    if ! validate_domain_in_config "$domain"; then
+    if ! __validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -451,7 +452,7 @@ bc.create_record() {
     fi
     
     # Backup zone file
-    backup_zone "$domain"
+    __backup_zone "$domain"
     
     # Add new record
     local record_line="${hostname}                 IN      A       ${ip_address}"
@@ -466,17 +467,17 @@ bc.create_record() {
     fi
     
     # Increment serial and validate
-    increment_serial "$zone_file"
+    __increment_serial "$zone_file"
     
-    if validate_zone "$domain"; then
+    if __validate_zone "$domain"; then
         # Create corresponding PTR record before reload
-        create_ptr_record "$ip_address" "$hostname" "$domain"
+        __create_ptr_record "$ip_address" "$hostname" "$domain"
         
         # Reload BIND to pick up both forward and reverse zone changes
-        reload_bind
+        __reload_bind
         
         print_status "success" "A record created: $hostname.$domain -> $ip_address"
-        log_action "Created A record: $hostname.$domain -> $ip_address"
+        __log_action "Created A record: $hostname.$domain -> $ip_address"
     else
         print_status "error" "Zone validation failed, restoring backup"
         # Restore from backup
@@ -542,7 +543,7 @@ bc.create_cname() {
     local alias domain target
     if [ $# -eq 2 ]; then
         # FQDN format: <fqdn> <target>
-        read alias domain <<< $(parse_fqdn "$1")
+        read alias domain <<< $(__parse_fqdn "$1")
         target=$2
         
         # If domain wasn't extracted, treat first arg as alias and fail
@@ -560,7 +561,7 @@ bc.create_cname() {
         return 1
     fi
     
-    print_manager_header
+    __print_manager_header
     echo -e "${WHITE}Creating CNAME Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Alias: $alias"
@@ -574,7 +575,7 @@ bc.create_cname() {
         return 1
     fi
     
-    if ! validate_domain_in_config "$domain"; then
+    if ! __validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -605,7 +606,7 @@ bc.create_cname() {
     fi
     
     # Backup zone file
-    backup_zone "$domain"
+    __backup_zone "$domain"
     
     # Add new CNAME record
     local record_line="${alias}                 IN      CNAME   ${target}"
@@ -621,12 +622,12 @@ bc.create_cname() {
     fi
     
     # Increment serial and validate
-    increment_serial "$zone_file"
+    __increment_serial "$zone_file"
     
-    if validate_zone "$domain"; then
-        reload_bind
+    if __validate_zone "$domain"; then
+        __reload_bind
         print_status "success" "CNAME record created: $alias.$domain -> $target"
-        log_action "Created CNAME record: $alias.$domain -> $target"
+        __log_action "Created CNAME record: $alias.$domain -> $target"
     else
         print_status "error" "Zone validation failed, restoring backup"
         # Restore from backup
@@ -690,7 +691,7 @@ bc.create_txt() {
     local domain=$2
     local text_value="$3"
     
-    print_manager_header
+    __print_manager_header
     echo -e "${WHITE}Creating TXT Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Name: $name"
@@ -704,7 +705,7 @@ bc.create_txt() {
         return 1
     fi
     
-    if ! validate_domain_in_config "$domain"; then
+    if ! __validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -715,7 +716,7 @@ bc.create_txt() {
     fi
     
     # Backup zone file
-    backup_zone "$domain"
+    __backup_zone "$domain"
     
     # Add new TXT record
     local record_line="${name}                 IN      TXT     \"${text_value}\""
@@ -724,12 +725,12 @@ bc.create_txt() {
     echo "$record_line" >> "$zone_file"
     
     # Increment serial and validate
-    increment_serial "$zone_file"
+    __increment_serial "$zone_file"
     
-    if validate_zone "$domain"; then
-        reload_bind
+    if __validate_zone "$domain"; then
+        __reload_bind
         print_status "success" "TXT record created: $name.$domain -> \"$text_value\""
-        log_action "Created TXT record: $name.$domain -> \"$text_value\""
+        __log_action "Created TXT record: $name.$domain -> \"$text_value\""
     else
         print_status "error" "Zone validation failed, restoring backup"
         # Restore from backup
@@ -796,7 +797,7 @@ bc.delete_record() {
     local name domain record_type
     if [ $# -eq 1 ] || ( [ $# -eq 2 ] && [[ "$2" =~ ^[A-Z]+$ ]] ); then
         # FQDN format: <fqdn> [record_type]
-        read name domain <<< $(parse_fqdn "$1")
+        read name domain <<< $(__parse_fqdn "$1")
         record_type=${2:-""}
         
         # If domain wasn't extracted, treat first arg as name and fail
@@ -814,7 +815,7 @@ bc.delete_record() {
         return 1
     fi
     
-    print_manager_header
+    __print_manager_header
     echo -e "${WHITE}Deleting DNS Record${NC}"
     echo -e "${CYAN}Compatible with BIND 9.16+ modern syntax${NC}"
     echo "Name: $name"
@@ -828,7 +829,7 @@ bc.delete_record() {
         return 1
     fi
     
-    if ! validate_domain_in_config "$domain"; then
+    if ! __validate_domain_in_config "$domain"; then
         print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
         return 1
     fi
@@ -867,18 +868,18 @@ bc.delete_record() {
     fi
     
     # Backup zone file
-    backup_zone "$domain"
+    __backup_zone "$domain"
     
     # Delete records
     sed -i "/$search_pattern/d" "$zone_file"
     
     # Increment serial and validate
-    increment_serial "$zone_file"
+    __increment_serial "$zone_file"
     
-    if validate_zone "$domain"; then
-        reload_bind
+    if __validate_zone "$domain"; then
+        __reload_bind
         print_status "success" "Record(s) deleted: $name from $domain"
-        log_action "Deleted record: $name from $domain"
+        __log_action "Deleted record: $name from $domain"
     else
         print_status "error" "Zone validation failed, restoring backup"
         # Restore from backup
@@ -933,12 +934,12 @@ bc.list_records() {
     local domain=${1:-""}
     local record_type=${2:-""}
     
-    print_manager_header
+    __print_manager_header
     echo -e "${WHITE}DNS Records${NC}"
     echo
     
     if [ -n "$domain" ]; then
-        if ! validate_domain_in_config "$domain"; then
+        if ! __validate_domain_in_config "$domain"; then
             print_status "error" "Invalid domain: $domain (available: ${DOMAINS[*]})"
             return 1
         fi
@@ -1054,9 +1055,9 @@ bc.list_records() {
         echo
     done
 }
-# Show environment info
-show_environment() {
-    print_manager_header
+# Show environment info (internal)
+__show_environment() {
+    __print_manager_header
     echo -e "${WHITE}Environment Information${NC}"
     echo
     echo "Mode: $(if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then echo "Container"; else echo "Host"; fi)"
@@ -1075,7 +1076,7 @@ show_environment() {
 
 # Function: bc.help
 bc.help() {
-    print_manager_header
+    __print_manager_header
     echo -e "${WHITE}Available Commands:${NC}"
     echo
     echo -e "  ${GREEN}bc.create_record${NC}  - Create DNS A record"
@@ -1083,14 +1084,13 @@ bc.help() {
     echo -e "  ${GREEN}bc.create_txt${NC}     - Create DNS TXT record"
     echo -e "  ${GREEN}bc.delete_record${NC}  - Delete DNS record"
     echo -e "  ${GREEN}bc.list_records${NC}   - List DNS records"
-    echo -e "  ${GREEN}refresh${NC}             - Refresh and validate DNS configuration"
-    echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
+    echo -e "  ${GREEN}bc.refresh${NC}         - Refresh and validate DNS configuration"
+    echo -e "  ${GREEN}bc.show_environment${NC} - Show environment information"
     echo -e "  ${GREEN}bc.help${NC}             - Show this help"
     echo
     echo -e "${YELLOW}Usage:${NC}"
     echo "  bc.create_record --help   (and similarly for other commands)"
-    echo "  show_environment"
-    echo "  refresh                   (or: $0 refresh when run as script)"
+    echo "  bc.refresh               (or: $0 refresh when run as script)"
     echo
     echo -e "${YELLOW}Example:${NC}"
     if [ ${#DOMAINS[@]} -gt 0 ]; then
@@ -1101,8 +1101,16 @@ bc.help() {
     echo
 }
 
-# Main function to handle command routing
-main() {
+# Wrappers so all entry points use the bc. prefix (bc.refresh goes through __main for check_root)
+bc.refresh() {
+    __main "$@"
+}
+bc.show_environment() {
+    __show_environment "$@"
+}
+
+# Internal dispatcher for bc.* entry points (root check and routing)
+__main() {
     # Create log file if it doesn't exist
     mkdir -p "$(dirname "$LOG_FILE")"
     touch "$LOG_FILE"
@@ -1130,14 +1138,20 @@ main() {
         bc.help)
             bc.help "$@"
             ;;
+        bc.show_environment)
+            __show_environment "$@"
+            ;;
+        bc.refresh)
+            __refresh_dns "$@"
+            ;;
             show_environment)
-                show_environment "$@"
+                __show_environment "$@"
                 ;;
             refresh)
-                refresh_dns "$@"
+                __refresh_dns "$@"
                 ;;
         *)
-            print_manager_header
+            __print_manager_header
             echo -e "${WHITE}Available Commands:${NC}"
             echo
                 echo -e "  ${GREEN}bc.create_record${NC}  - Create DNS A record"
@@ -1145,13 +1159,13 @@ main() {
                 echo -e "  ${GREEN}bc.create_txt${NC}     - Create DNS TXT record"
                 echo -e "  ${GREEN}bc.delete_record${NC}  - Delete DNS record"
                 echo -e "  ${GREEN}bc.list_records${NC}   - List DNS records"
-                echo -e "  ${GREEN}refresh${NC}             - Refresh and validate DNS configuration"
-                echo -e "  ${GREEN}show_environment${NC}    - Show environment information"
+                echo -e "  ${GREEN}bc.refresh${NC}         - Refresh and validate DNS configuration"
+                echo -e "  ${GREEN}bc.show_environment${NC} - Show environment information"
             echo
             echo -e "${YELLOW}Usage:${NC}"
             echo "  source $0"
             echo "  bc.create_record --help"
-            echo "  show_environment"
+            echo "  bc.help"
             echo
             echo -e "${YELLOW}Example:${NC}"
             if [ ${#DOMAINS[@]} -gt 0 ]; then
@@ -1164,12 +1178,12 @@ main() {
 }
 
 # DNS Refresh and Maintenance Functions
-refresh_dns() {
-    print_manager_header
-    log_action "Starting DNS refresh process (container-aware)"
+__refresh_dns() {
+    __print_manager_header
+    __log_action "Starting DNS refresh process (container-aware)"
     
     # Ensure proper ownership of zone files
-    log_action "Ensuring proper ownership of zone files in $BIND_DIR"
+    __log_action "Ensuring proper ownership of zone files in $BIND_DIR"
     if [ -d "$BIND_DIR" ]; then
         if is_container; then
             # Running inside container
@@ -1183,20 +1197,20 @@ refresh_dns() {
     fi
     
     # Check configuration and zones
-    if validate_bind_config && check_zones; then
-        log_action "Configuration and zone validation passed"
+    if validate_bind_config && __check_zones; then
+        __log_action "Configuration and zone validation passed"
         print_status "success" "DNS refresh completed successfully"
     else
-        log_action "ERROR: Configuration or zone validation failed"
+        __log_action "ERROR: Configuration or zone validation failed"
         print_status "error" "DNS refresh failed - check configuration"
         return 1
     fi
     
-    log_action "DNS refresh process completed"
+    __log_action "DNS refresh process completed"
 }
 
 # Check individual zone files
-check_zones() {
+__check_zones() {
     local errors=0
     local zones=($(discover_domains))
     
@@ -1210,16 +1224,16 @@ check_zones() {
         fi
         
         if [ -z "$zone_file" ]; then
-            log_action "WARNING: Zone file for $zone not found"
+            __log_action "WARNING: Zone file for $zone not found"
             continue
         fi
         
         if is_container; then
             # Running inside container
             if named-checkzone "$zone" "$zone_file" >/dev/null 2>&1; then
-                log_action "Zone $zone is valid"
+                __log_action "Zone $zone is valid"
             else
-                log_action "ERROR: Zone $zone has errors"
+                __log_action "ERROR: Zone $zone has errors"
                 ((errors++))
             fi
         else
@@ -1228,13 +1242,13 @@ check_zones() {
                 # Convert host path to container path
                 local container_zone_file=$(echo "$zone_file" | sed "s|$BIND_DIR|/var/named|")
                 if podman exec "$CONTAINER_NAME" named-checkzone "$zone" "$container_zone_file" >/dev/null 2>&1; then
-                    log_action "Zone $zone is valid"
+                    __log_action "Zone $zone is valid"
                 else
-                    log_action "ERROR: Zone $zone has errors"
+                    __log_action "ERROR: Zone $zone has errors"
                     ((errors++))
                 fi
             else
-                log_action "Cannot validate zone $zone - container not running"
+                __log_action "Cannot validate zone $zone - container not running"
             fi
         fi
     done
@@ -1251,10 +1265,10 @@ fi
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     case "${1:-help}" in
         "refresh")
-            refresh_dns
+            __refresh_dns
             ;;
         "help"|"-h"|"--help")
-            print_manager_header
+            __print_manager_header
             echo "⚓ BindCaptain - Direct Commands"
             echo
             echo "Usage: $0 [COMMAND]"
@@ -1268,7 +1282,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
             echo "  bc.create_record --help"
             ;;
         *)
-            print_manager_header
+            __print_manager_header
             echo "Unknown command: $1"
             echo "Use '$0 help' for available commands"
             exit 1

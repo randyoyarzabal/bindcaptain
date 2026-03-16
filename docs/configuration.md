@@ -442,8 +442,9 @@ sudo named-checkzone example.com /opt/bindcaptain/zones/example.com.db
 #### Zone File Issues
 
 ```bash
-# Validate zone file
-sudo ./tools/bindcaptain_manager.sh validate-zone example.com
+# Load the manager, then validate and reload (or use Chief bc.refresh remotely)
+source /opt/bindcaptain/tools/bindcaptain_manager.sh
+bc.refresh
 
 # Check zone syntax
 sudo named-checkzone example.com /opt/bindcaptain/zones/example.com.db

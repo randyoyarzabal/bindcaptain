@@ -4,27 +4,30 @@ Complete guide to managing DNS records and zones with BindCaptain.
 
 ## DNS Management Overview
 
-BindCaptain provides comprehensive DNS management through the `bindcaptain_manager.sh` script, offering both interactive and command-line interfaces.
+BindCaptain provides DNS management through the `tools/bindcaptain_manager.sh` script. Use the `bc.*` functions after sourcing the script.
 
 ## Loading Management Functions
 
 ### Source the Script
 
 ```bash
-# Load all DNS management functions
+# Load all DNS management functions (from repo root or /opt/bindcaptain)
 source ./tools/bindcaptain_manager.sh
+# Or when installed: source /opt/bindcaptain/tools/bindcaptain_manager.sh
 ```
 
-### Available Functions
+### Available Commands (bc.*)
 
 After sourcing, you get access to:
 
-- `bc.create_record` - Create DNS records
+- `bc.create_record` - Create A records (PTR created automatically for configured networks)
+- `bc.create_cname` - Create CNAME records
+- `bc.create_txt` - Create TXT records
 - `bc.delete_record` - Delete DNS records
-- `bc.list_records` - List DNS records
-- `bind.list_zones` - List all zones
-- `bind.refresh` - Reload BIND configuration
-- `bind.validate` - Validate DNS configuration
+- `bc.list_records` - List records (all zones or by domain/type)
+- `bc.refresh` - Validate zones and reload BIND
+- `bc.show_environment` - Show paths, domains, and container status
+- `bc.help` - Show usage and examples
 
 ## Creating DNS Records
 
@@ -64,13 +67,7 @@ bc.create_txt example.com example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
 
 ### PTR Records (Reverse DNS)
 
-```bash
-# Create PTR record
-bind.create_ptr 100 1.168.192.in-addr.arpa webserver.example.com
-
-# Create PTR with TTL
-bind.create_ptr 101 1.168.192.in-addr.arpa mail.example.com 3600
-```
+PTR records are created **automatically** when you add A records with `bc.create_record`, for networks configured in the manager (e.g. 172.25.40.0/24, 172.25.42.0/24, 172.25.50.0/24). No separate PTR command is needed.
 
 ## Managing DNS Records
 
@@ -111,103 +108,27 @@ bc.delete_record mail example.com
 bc.create_record mail example.com 192.168.1.201 7200
 ```
 
-## Zone Management
+## Zone and BIND Management
 
-### Listing Zones
-
-```bash
-# List all configured zones
-bind.list_zones
-
-# List zones with details
-bind.list_zones --verbose
-```
-
-### Creating New Zones
+### Refresh and Validate
 
 ```bash
-# Create forward zone
-bind.create_zone example.com
-
-# Create reverse zone
-bind.create_zone 1.168.192.in-addr.arpa
-
-# Create zone with specific settings
-bind.create_zone test.com --primary-ns ns1.test.com --admin-email admin@test.com
+# Validate all zones and reload BIND (run after sourcing the manager)
+bc.refresh
 ```
 
-### Zone Validation
+When run as a script (e.g. from cron), use:
 
 ```bash
-# Validate specific zone
-bind.validate_zone example.com
-
-# Validate all zones
-bind.validate_all_zones
-
-# Check zone syntax
-bind.check_zone example.com
-```
-
-## BIND Configuration Management
-
-### Reloading Configuration
-
-```bash
-# Reload BIND configuration
-bind.refresh
-
-# Reload specific zone
-bind.reload_zone example.com
-
-# Check configuration before reload
-bind.validate_config
-```
-
-### Configuration Validation
-
-```bash
-# Validate main configuration
-bind.validate_config
-
-# Validate specific zone
-bind.validate_zone example.com
-
-# Check all zones
-bind.check_all_zones
-```
-
-## Interactive Management
-
-### Launch Interactive Mode
-
-```bash
-# Start interactive DNS management
-./tools/bindcaptain_manager.sh
-```
-
-Interactive menu options:
-
-```
-1. Create A Record
-2. Create CNAME Record
-3. Create TXT Record
-4. Create PTR Record
-5. List Records
-6. Delete Record
-7. List Zones
-8. Refresh DNS
-9. Validate Configuration
-10. Exit
-```
-
-### Command Line Interface
-
-```bash
-# Direct command execution
-./tools/bindcaptain_manager.sh create-record webserver example.com 192.168.1.100
-./tools/bindcaptain_manager.sh list-records example.com
 ./tools/bindcaptain_manager.sh refresh
+# Or: /opt/bindcaptain/tools/bindcaptain_manager.sh refresh
+```
+
+### Environment and Help
+
+```bash
+bc.show_environment   # Show BIND paths, domains, container status
+bc.help               # Show all bc.* commands and usage
 ```
 
 ## Advanced Operations
@@ -223,65 +144,13 @@ while read -r hostname ip; do
 done < hosts.txt
 ```
 
-#### Backup and Restore
+#### Backup
 
-```bash
-# Backup zone files
-bind.backup_zones
+Zone backups are created automatically by the manager when `BINDCAPTAIN_ENABLE_BACKUPS=true` and you use `bc.create_record` (or other record commands) with the `--backup` flag. Backup location: `$CONTAINER_DATA_DIR/backups` (e.g. `/opt/bindcaptain/backups` on the host).
 
-# Restore from backup
-bind.restore_zones backup-2024-01-15
-```
+### Zone File Paths
 
-### Zone File Management
-
-#### Direct Zone File Editing
-
-```bash
-# Edit zone file directly
-sudo nano /opt/bindcaptain/zones/example.com.db
-
-# Reload after editing
-bind.reload_zone example.com
-```
-
-#### Zone File Validation
-
-```bash
-# Check zone file syntax
-sudo named-checkzone example.com /opt/bindcaptain/zones/example.com.db
-
-# Check all zone files
-bind.check_all_zones
-```
-
-## Monitoring and Logging
-
-### DNS Query Logging
-
-```bash
-# Enable query logging
-bind.enable_query_logging
-
-# Disable query logging
-bind.disable_query_logging
-
-# View query logs
-bind.view_query_logs
-```
-
-### Performance Monitoring
-
-```bash
-# Check DNS response times
-bind.test_response_time example.com
-
-# Monitor query statistics
-bind.show_statistics
-
-# Check zone transfer status
-bind.check_zone_transfers
-```
+When installed under `/opt/bindcaptain`, zone files live under `/opt/bindcaptain/config/` (e.g. `config/example.com/example.com.db`). The manager uses these paths; use `bc.show_environment` to see the exact `BIND_DIR` and domains.
 
 ## Troubleshooting DNS Issues
 
@@ -290,53 +159,37 @@ bind.check_zone_transfers
 #### DNS Not Resolving
 
 ```bash
-# Check BIND status
+# Check container status
 sudo ./bindcaptain.sh status
 
-# Check zone configuration
-bind.validate_zone example.com
+# Validate and reload (after sourcing the manager)
+source ./tools/bindcaptain_manager.sh
+bc.refresh
 
 # Test DNS resolution
 dig @localhost example.com
 ```
 
-#### Zone Transfer Issues
-
-```bash
-# Check zone transfer permissions
-bind.check_zone_transfers
-
-# Validate zone file
-bind.validate_zone example.com
-
-# Check BIND logs
-sudo tail -f /opt/bindcaptain/logs/named.log
-```
-
 #### Configuration Errors
 
 ```bash
-# Validate configuration
-bind.validate_config
+# Validate and reload
+source ./tools/bindcaptain_manager.sh
+bc.refresh
 
-# Check syntax
+# Check BIND config syntax (when paths known)
 sudo named-checkconf /opt/bindcaptain/config/named.conf
-
-# Reload configuration
-bind.refresh
 ```
 
 ### Debug Commands
 
 ```bash
-# Enable debug logging
-bind.enable_debug_logging 3
-
-# Check BIND processes
+# Check BIND processes in container
 sudo podman exec bindcaptain ps aux | grep named
 
-# Monitor DNS queries
-sudo podman exec bindcaptain tcpdump -i any port 53
+# View logs
+sudo ./bindcaptain.sh logs
+# Or: sudo podman logs bindcaptain
 ```
 
 ## Best Practices
@@ -380,20 +233,16 @@ bc.create_record web example.com 192.168.1.30
 bc.create_cname www example.com web.example.com
 bc.create_cname ftp example.com web.example.com
 
-# Create TXT records
-bc.create_txt example.com example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
+# Create TXT records (name, domain, value)
+bc.create_txt @ example.com "v=spf1 mx a ip4:192.168.1.0/24 ~all"
 bc.create_txt _dmarc example.com "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
 
-# Create PTR records
-bind.create_ptr 10 1.168.192.in-addr.arpa ns1.example.com
-bind.create_ptr 11 1.168.192.in-addr.arpa ns2.example.com
-bind.create_ptr 20 1.168.192.in-addr.arpa mail.example.com
-bind.create_ptr 30 1.168.192.in-addr.arpa web.example.com
+# PTR records are created automatically when adding A records (for configured networks)
 
-# Refresh configuration
-bind.refresh
+# Refresh and validate configuration
+bc.refresh
 ```
 
 ---
 
-**Need help?** Check the [Troubleshooting Guide](troubleshooting.md) or [Configuration Reference](config-reference.md).
+**Need help?** Check the [Troubleshooting Guide](troubleshooting.md) or [Configuration](configuration.md).

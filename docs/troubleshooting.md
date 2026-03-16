@@ -96,8 +96,9 @@ sudo podman run --rm -it bindcaptain:latest named -g -u named -c /dev/null
 # Check BIND status
 sudo podman exec bindcaptain systemctl status named
 
-# Check zone configuration
-sudo ./tools/bindcaptain_manager.sh validate-zone example.com
+# Load the manager, then validate and reload (or use Chief bc.refresh remotely)
+source /opt/bindcaptain/tools/bindcaptain_manager.sh
+bc.refresh
 
 # Test with dig
 dig @localhost example.com +trace

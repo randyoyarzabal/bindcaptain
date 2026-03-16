@@ -143,7 +143,7 @@ bindcaptain/
 │   ├── common.sh              # Shared utilities library
 │   ├── system-setup.sh        # System preparation (supported distros)
 │   ├── config-setup.sh        # DNS configuration management
-│   └── bindcaptain_manager.sh # Interactive DNS management
+│   └── bindcaptain_manager.sh # DNS management (bc.*); run 'refresh' or source for bc.help
 ├── config-examples/            # Configuration templates
 ├── docs/                      # Comprehensive documentation
 └── tests/                     # Test suite

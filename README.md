@@ -80,10 +80,21 @@ sudo ./bindcaptain.sh start|stop|restart|service-status
 
 ### DNS Record Management
 
-```bash
-# Source the manager
-sudo bash -c "source /opt/bindcaptain/tools/bindcaptain_manager.sh"
+**Load the manager** in your shell (once per session, or add to your shell profile on the DNS host):
 
+```bash
+# From repo directory:
+source ./tools/bindcaptain_manager.sh
+
+# When installed under /opt/bindcaptain:
+source /opt/bindcaptain/tools/bindcaptain_manager.sh
+```
+
+To have it loaded automatically when you log in as root, add one of the lines above to root’s `~/.bashrc` or `~/.profile`. For remote management from your workstation, use the [Chief bc plugin](chief-plugin/README.md).
+
+Then run `bc.*` commands (as root on the DNS host):
+
+```bash
 # Add records
 bc.create_record webserver yourdomain.com 192.168.1.100
 bc.create_cname www yourdomain.com webserver
