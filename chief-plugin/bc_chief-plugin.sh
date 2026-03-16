@@ -80,10 +80,10 @@ _bc_check_connection() {
 # Show help
 function bc.help() {
   cat << 'EOF'
-⚓ BindCaptain DNS Manager - Chief Plugin
+⚓ BindCaptain - Chief Plugin
 
-  Remote BindCaptain management: commands run on the host configured in BC_HOST
-  via SSH. Use this to manage DNS and the BindCaptain service from your local
+  Remote ⚓ BindCaptain management: commands run on the host configured in BC_HOST
+  via SSH. Use this to manage DNS and the ⚓ BindCaptain service from your local
   machine without logging into the server.
 
   Chief is a separate project. For more info (what it is, how to install, plugins):
@@ -96,7 +96,7 @@ USAGE:
   bc.delete <fqdn> [type]                      Delete DNS record
   bc.list [domain]                             List records (all or specific)
   bc.refresh                                   Refresh DNS config
-  bc.git_refresh                               Update BindCaptain from Git
+  bc.git_refresh                               Update ⚓ BindCaptain from Git
   bc.status                                    Show service status
   bc.start                                     Start service
   bc.stop                                      Stop service
@@ -288,14 +288,14 @@ This will:
   
   _bc_check_connection || return 1
   
-  echo "Refreshing BindCaptain DNS configuration..."
+  echo "Refreshing ⚓ BindCaptain DNS configuration..."
   _bc_ssh "sudo $BC_MANAGER refresh"
 }
 
-# Update BindCaptain from GitHub
+# Update ⚓ BindCaptain from GitHub
 function bc.git_refresh() {
   local USAGE="Usage: $FUNCNAME
-Update BindCaptain codebase from Git (e.g. GitHub).
+Update ⚓ BindCaptain codebase from Git (e.g. GitHub).
 
 This will:
   - Pull latest changes from the remote repository
@@ -309,14 +309,14 @@ This will:
   
   _bc_check_connection || return 1
   
-  echo "Updating BindCaptain from Git..."
+  echo "Updating ⚓ BindCaptain from Git..."
   _bc_ssh "sudo bash -c 'cd \$(dirname \"$BC_MANAGER\")/.. && git pull'"
 }
 
-# SSH to remote BindCaptain host
+# SSH to remote ⚓ BindCaptain host
 function bc.ssh() {
   local USAGE="Usage: $FUNCNAME
-Open an SSH connection to the BindCaptain host ($BC_HOST)."
+Open an SSH connection to the ⚓ BindCaptain host ($BC_HOST)."
   
   if [[ $1 == "-?" ]]; then
     echo "$USAGE"
@@ -329,10 +329,10 @@ Open an SSH connection to the BindCaptain host ($BC_HOST)."
   ssh "$BC_HOST"
 }
 
-# Show BindCaptain status
+# Show ⚓ BindCaptain status
 function bc.status() {
   local USAGE="Usage: $FUNCNAME
-Show BindCaptain service status and environment information."
+Show ⚓ BindCaptain service status and environment information."
   
   if [[ $1 == "-?" ]]; then
     echo "$USAGE"
@@ -341,7 +341,7 @@ Show BindCaptain service status and environment information."
   
   _bc_check_connection || return 1
   
-  echo "BindCaptain Status on $BC_HOST:"
+  echo "⚓ BindCaptain status on $BC_HOST:"
   echo "=========================================="
   _bc_ssh "sudo systemctl status bindcaptain --no-pager -l"
   echo ""
@@ -350,10 +350,10 @@ Show BindCaptain service status and environment information."
   _bc_ssh "sudo podman ps -a --filter name=bindcaptain"
 }
 
-# Start BindCaptain service
+# Start ⚓ BindCaptain service
 function bc.start() {
   local USAGE="Usage: $FUNCNAME
-Start the BindCaptain service on the remote host."
+Start the ⚓ BindCaptain service on the remote host."
   
   if [[ $1 == "-?" ]]; then
     echo "$USAGE"
@@ -362,17 +362,17 @@ Start the BindCaptain service on the remote host."
   
   _bc_check_connection || return 1
   
-  echo "Starting BindCaptain service..."
+  echo "Starting ⚓ BindCaptain service..."
   _bc_ssh "sudo systemctl start bindcaptain"
-  echo "✓ BindCaptain service started"
+  echo "✓ ⚓ BindCaptain service started"
   sleep 2
   bc.status
 }
 
-# Stop BindCaptain service
+# Stop ⚓ BindCaptain service
 function bc.stop() {
   local USAGE="Usage: $FUNCNAME
-Stop the BindCaptain service on the remote host."
+Stop the ⚓ BindCaptain service on the remote host."
   
   if [[ $1 == "-?" ]]; then
     echo "$USAGE"
@@ -381,15 +381,15 @@ Stop the BindCaptain service on the remote host."
   
   _bc_check_connection || return 1
   
-  echo "Stopping BindCaptain service..."
+  echo "Stopping ⚓ BindCaptain service..."
   _bc_ssh "sudo systemctl stop bindcaptain"
-  echo "✓ BindCaptain service stopped"
+  echo "✓ ⚓ BindCaptain service stopped"
 }
 
-# Restart BindCaptain service
+# Restart ⚓ BindCaptain service
 function bc.restart() {
   local USAGE="Usage: $FUNCNAME
-Restart the BindCaptain service on the remote host."
+Restart the ⚓ BindCaptain service on the remote host."
   
   if [[ $1 == "-?" ]]; then
     echo "$USAGE"
@@ -398,9 +398,9 @@ Restart the BindCaptain service on the remote host."
   
   _bc_check_connection || return 1
   
-  echo "Restarting BindCaptain service..."
+  echo "Restarting ⚓ BindCaptain service..."
   _bc_ssh "sudo systemctl restart bindcaptain"
-  echo "✓ BindCaptain service restarted"
+  echo "✓ ⚓ BindCaptain service restarted"
   sleep 2
   bc.status
 }
@@ -413,4 +413,4 @@ alias bc.rm='bc.delete'
 alias bc.ls='bc.list'
 
 # Show quick help on load
-echo "⚓ BindCaptain DNS Manager loaded. Type 'bc.help' for usage."
+echo "⚓ BindCaptain loaded. Type 'bc.help' for usage."

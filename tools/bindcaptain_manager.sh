@@ -125,7 +125,7 @@ parse_fqdn() {
 
 # Custom header for this script
 print_manager_header() {
-    print_header "BIND DNS Management Tool" "(Container-aware)"
+    print_header "⚓ BindCaptain" "(Container-aware DNS Management)"
 }
 
 # Manager-specific domain validation (checks against discovered domains)
@@ -1244,7 +1244,7 @@ check_zones() {
 
 # When sourced, show load message (skip when run as script)
 if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
-    echo "⚓ BindCaptain DNS Manager loaded. Type 'bc.help' for usage."
+    echo "⚓ BindCaptain loaded. Type 'bc.help' for usage."
 fi
 
 # Direct command line interface
@@ -1255,7 +1255,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
             ;;
         "help"|"-h"|"--help")
             print_manager_header
-            echo "BindCaptain DNS Manager - Direct Commands"
+            echo "⚓ BindCaptain - Direct Commands"
             echo
             echo "Usage: $0 [COMMAND]"
             echo
