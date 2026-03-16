@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ⚓ BindCaptain DNS Manager
+# ⚓BindCaptain DNS Manager
 # Container-aware DNS management for modern BIND infrastructure
 # Take command of your DNS records with confidence
 #
@@ -126,7 +126,7 @@ __parse_fqdn() {
 
 # Custom header for this script
 __print_manager_header() {
-    print_header "⚓ BindCaptain" "(Container-aware DNS Management)"
+    print_header "⚓BindCaptain" "(Container-aware DNS Management)"
 }
 
 # Manager-specific domain validation (checks against discovered domains)
@@ -1085,7 +1085,7 @@ bc.help() {
     echo -e "  ${GREEN}bc.delete${NC} / ${GREEN}bc.delete_record${NC}  - Delete DNS record"
     echo -e "  ${GREEN}bc.list${NC} / ${GREEN}bc.list_records${NC}   - List records (all or by domain)"
     echo -e "  ${GREEN}bc.refresh${NC}         - Validate zones and reload BIND"
-    echo -e "  ${GREEN}bc.git_refresh${NC}     - Update ⚓ BindCaptain from Git"
+    echo -e "  ${GREEN}bc.git_refresh${NC}     - Update ⚓BindCaptain from Git"
     echo -e "  ${GREEN}bc.status${NC}          - Show service and container status"
     echo -e "  ${GREEN}bc.start${NC} / ${GREEN}bc.stop${NC} / ${GREEN}bc.restart${NC} - Service control"
     echo -e "  ${GREEN}bc.show_environment${NC} - Show paths and domains"
@@ -1128,7 +1128,7 @@ bc.delete() {
 
 # Service control (parity with Chief plugin; run on host)
 bc.status() {
-    echo -e "${CYAN}⚓ BindCaptain status:${NC}"
+    echo -e "${CYAN}⚓BindCaptain status:${NC}"
     echo "=========================================="
     systemctl status bindcaptain --no-pager -l 2>/dev/null || true
     echo ""
@@ -1137,34 +1137,34 @@ bc.status() {
 }
 bc.start() {
     check_root
-    echo "Starting ⚓ BindCaptain service..."
+    echo "Starting ⚓BindCaptain service..."
     systemctl start bindcaptain
-    echo -e "${GREEN}✓ ⚓ BindCaptain service started${NC}"
+    echo -e "${GREEN}✓ ⚓BindCaptain service started${NC}"
     sleep 2
     bc.status
 }
 bc.stop() {
     check_root
-    echo "Stopping ⚓ BindCaptain service..."
+    echo "Stopping ⚓BindCaptain service..."
     systemctl stop bindcaptain
-    echo -e "${GREEN}✓ ⚓ BindCaptain service stopped${NC}"
+    echo -e "${GREEN}✓ ⚓BindCaptain service stopped${NC}"
 }
 bc.restart() {
     check_root
-    echo "Restarting ⚓ BindCaptain service..."
+    echo "Restarting ⚓BindCaptain service..."
     systemctl restart bindcaptain
-    echo -e "${GREEN}✓ ⚓ BindCaptain service restarted${NC}"
+    echo -e "${GREEN}✓ ⚓BindCaptain service restarted${NC}"
     sleep 2
     bc.status
 }
 bc.git_refresh() {
     check_root
-    echo "Updating ⚓ BindCaptain from Git..."
+    echo "Updating ⚓BindCaptain from Git..."
     (cd "$SCRIPT_DIR/.." && git pull) || {
         print_status "error" "git pull failed"
         return 1
     }
-    echo -e "${GREEN}✓ ⚓ BindCaptain updated${NC}"
+    echo -e "${GREEN}✓ ⚓BindCaptain updated${NC}"
 }
 # No-op when already on host (plugin uses this to open SSH)
 bc.ssh() {
@@ -1306,7 +1306,7 @@ __check_zones() {
 
 # When sourced, show load message and set aliases (skip when run as script)
 if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
-    echo "⚓ BindCaptain loaded. Type 'bc.help' for usage."
+    echo "⚓BindCaptain loaded. Type 'bc.help' for usage."
     alias bc.a='bc.create'
     alias bc.ls='bc.list'
     alias bc.rm='bc.delete'
@@ -1322,7 +1322,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
             ;;
         "help"|"-h"|"--help")
             __print_manager_header
-            echo "⚓ BindCaptain - Direct Commands"
+            echo "⚓BindCaptain - Direct Commands"
             echo
             echo "Usage: $0 [COMMAND]"
             echo
