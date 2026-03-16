@@ -50,7 +50,11 @@
 #   - BindCaptain container running (for some operations)
 #   - Valid DNS configuration
 
-set -e
+# Only enable exit-on-error when run as a script. When sourced (e.g. root login,
+# bc.ssh, or chief.plugin), a failing command would exit the caller's shell.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    set -e
+fi
 
 # Resolve script path so sourcing works when invoked via symlink (e.g. chief.plugin).
 # Otherwise SCRIPT_DIR points to the symlink's directory and source of common.sh fails, exiting the shell.
@@ -82,8 +86,8 @@ BACKUP_DIR="$CONTAINER_DATA_DIR/backups"
 # Backup control - disabled by default
 ENABLE_BACKUPS="${BINDCAPTAIN_ENABLE_BACKUPS:-false}"
 
-# Manager-specific variables
-DOMAINS=($(discover_domains))
+# Manager-specific variables (safe when sourced: discover_domains may fail if config not ready)
+domains_output=$(discover_domains 2>/dev/null) && DOMAINS=($domains_output) || DOMAINS=()
 DEFAULT_TTL="86400"
 
 # Manager-specific logging function
