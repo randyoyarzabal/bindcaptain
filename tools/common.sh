@@ -31,17 +31,21 @@ is_container() {
 }
 
 # Get appropriate paths based on execution context
+# When on host, CONTAINER_NAMED_CONF is the path used inside the container (for podman exec).
 get_bind_paths() {
     if is_container; then
         # Running inside container
         BIND_DIR="/var/named"
         NAMED_CONF="/etc/named.conf"
         LOG_DIR="/var/log/named"
+        CONTAINER_NAMED_CONF="/etc/named.conf"
     else
-        # Running on host - target the same config the container uses
+        # Running on host - target the same config the container uses (host paths)
         BIND_DIR="$CONTAINER_DATA_DIR/config"
         NAMED_CONF="$CONTAINER_DATA_DIR/config/named.conf"
         LOG_DIR="$CONTAINER_DATA_DIR/logs"
+        # Path as seen inside the container (bindcaptain.sh mounts named.conf at /etc/named.conf)
+        CONTAINER_NAMED_CONF="/etc/named.conf"
     fi
 }
 
@@ -180,6 +184,7 @@ reload_bind() {
 }
 
 # Validate BIND configuration
+# When on host with container running, uses container path (/etc/named.conf) for named-checkconf.
 validate_bind_config() {
     local config_file="${1:-$NAMED_CONF}"
     
@@ -188,7 +193,12 @@ validate_bind_config() {
         return 1
     fi
     
-    if exec_in_context "named-checkconf $config_file"; then
+    local check_path="$config_file"
+    if ! is_container && is_container_running; then
+        # When we exec into the container, use the path inside the container (mount is at /etc/named.conf)
+        check_path="${CONTAINER_NAMED_CONF:-/etc/named.conf}"
+    fi
+    if exec_in_context "named-checkconf $check_path"; then
         print_status "success" "BIND configuration is valid"
         return 0
     else
