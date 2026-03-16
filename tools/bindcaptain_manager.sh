@@ -1077,26 +1077,32 @@ __show_environment() {
 # Function: bc.help
 bc.help() {
     __print_manager_header
-    echo -e "${WHITE}Available Commands:${NC}"
+    echo -e "${WHITE}Available Commands (same API on host and via Chief plugin):${NC}"
     echo
-    echo -e "  ${GREEN}bc.create_record${NC}  - Create DNS A record"
-    echo -e "  ${GREEN}bc.create_cname${NC}   - Create DNS CNAME record"
-    echo -e "  ${GREEN}bc.create_txt${NC}     - Create DNS TXT record"
-    echo -e "  ${GREEN}bc.delete_record${NC}  - Delete DNS record"
-    echo -e "  ${GREEN}bc.list_records${NC}   - List DNS records"
-    echo -e "  ${GREEN}bc.refresh${NC}         - Refresh and validate DNS configuration"
-    echo -e "  ${GREEN}bc.show_environment${NC} - Show environment information"
+    echo -e "  ${GREEN}bc.create${NC} / ${GREEN}bc.create_record${NC}  - Create DNS A record (auto PTR)"
+    echo -e "  ${GREEN}bc.create_cname${NC}   - Create CNAME record"
+    echo -e "  ${GREEN}bc.create_txt${NC}     - Create TXT record"
+    echo -e "  ${GREEN}bc.delete${NC} / ${GREEN}bc.delete_record${NC}  - Delete DNS record"
+    echo -e "  ${GREEN}bc.list${NC} / ${GREEN}bc.list_records${NC}   - List records (all or by domain)"
+    echo -e "  ${GREEN}bc.refresh${NC}         - Validate zones and reload BIND"
+    echo -e "  ${GREEN}bc.git_refresh${NC}     - Update ⚓ BindCaptain from Git"
+    echo -e "  ${GREEN}bc.status${NC}          - Show service and container status"
+    echo -e "  ${GREEN}bc.start${NC} / ${GREEN}bc.stop${NC} / ${GREEN}bc.restart${NC} - Service control"
+    echo -e "  ${GREEN}bc.show_environment${NC} - Show paths and domains"
+    echo -e "  ${GREEN}bc.ssh${NC}             - (Remote only: open SSH; on host: no-op)"
     echo -e "  ${GREEN}bc.help${NC}             - Show this help"
     echo
+    echo -e "  Aliases: ${CYAN}bc.a${NC}=bc.create ${CYAN}bc.ls${NC}=bc.list ${CYAN}bc.rm${NC}=bc.delete ${CYAN}bc.cname${NC}=bc.create_cname ${CYAN}bc.txt${NC}=bc.create_txt"
+    echo
     echo -e "${YELLOW}Usage:${NC}"
-    echo "  bc.create_record --help   (and similarly for other commands)"
-    echo "  bc.refresh               (or: $0 refresh when run as script)"
+    echo "  bc.create <fqdn> <ip>   or   bc.create_record --help"
+    echo "  bc.refresh              (or: $0 refresh when run as script)"
     echo
     echo -e "${YELLOW}Example:${NC}"
     if [ ${#DOMAINS[@]} -gt 0 ]; then
-        echo "  bc.create_record webserver ${DOMAINS[0]} 172.25.50.100"
+        echo "  bc.create webserver.${DOMAINS[0]} 172.25.50.100   # or bc.create_record webserver ${DOMAINS[0]} 172.25.50.100"
     else
-        echo "  bc.create_record webserver example.com 172.25.50.100"
+        echo "  bc.create webserver.example.com 172.25.50.100"
     fi
     echo
 }
@@ -1107,6 +1113,62 @@ bc.refresh() {
 }
 bc.show_environment() {
     __show_environment "$@"
+}
+
+# Short names (same as Chief plugin) so host and remote have identical bc.* API
+bc.create() {
+    bc.create_record "$@"
+}
+bc.list() {
+    bc.list_records "$@"
+}
+bc.delete() {
+    bc.delete_record "$@"
+}
+
+# Service control (parity with Chief plugin; run on host)
+bc.status() {
+    echo -e "${CYAN}⚓ BindCaptain status:${NC}"
+    echo "=========================================="
+    systemctl status bindcaptain --no-pager -l 2>/dev/null || true
+    echo ""
+    echo "Container:"
+    podman ps -a --filter name="$CONTAINER_NAME" 2>/dev/null || true
+}
+bc.start() {
+    check_root
+    echo "Starting ⚓ BindCaptain service..."
+    systemctl start bindcaptain
+    echo -e "${GREEN}✓ ⚓ BindCaptain service started${NC}"
+    sleep 2
+    bc.status
+}
+bc.stop() {
+    check_root
+    echo "Stopping ⚓ BindCaptain service..."
+    systemctl stop bindcaptain
+    echo -e "${GREEN}✓ ⚓ BindCaptain service stopped${NC}"
+}
+bc.restart() {
+    check_root
+    echo "Restarting ⚓ BindCaptain service..."
+    systemctl restart bindcaptain
+    echo -e "${GREEN}✓ ⚓ BindCaptain service restarted${NC}"
+    sleep 2
+    bc.status
+}
+bc.git_refresh() {
+    check_root
+    echo "Updating ⚓ BindCaptain from Git..."
+    (cd "$SCRIPT_DIR/.." && git pull) || {
+        print_status "error" "git pull failed"
+        return 1
+    }
+    echo -e "${GREEN}✓ ⚓ BindCaptain updated${NC}"
+}
+# No-op when already on host (plugin uses this to open SSH)
+bc.ssh() {
+    echo -e "${CYAN}Already on BindCaptain host. Use bc.help for commands.${NC}"
 }
 
 # Internal dispatcher for bc.* entry points (root check and routing)
@@ -1152,27 +1214,13 @@ __main() {
                 ;;
         *)
             __print_manager_header
-            echo -e "${WHITE}Available Commands:${NC}"
+            echo -e "${WHITE}Available Commands:${NC} (bc.help for full list)"
             echo
-                echo -e "  ${GREEN}bc.create_record${NC}  - Create DNS A record"
-                echo -e "  ${GREEN}bc.create_cname${NC}   - Create DNS CNAME record"
-                echo -e "  ${GREEN}bc.create_txt${NC}     - Create DNS TXT record"
-                echo -e "  ${GREEN}bc.delete_record${NC}  - Delete DNS record"
-                echo -e "  ${GREEN}bc.list_records${NC}   - List DNS records"
-                echo -e "  ${GREEN}bc.refresh${NC}         - Refresh and validate DNS configuration"
-                echo -e "  ${GREEN}bc.show_environment${NC} - Show environment information"
+            echo -e "  DNS: bc.create, bc.create_cname, bc.create_txt, bc.delete, bc.list"
+            echo -e "  Service: bc.refresh, bc.status, bc.start, bc.stop, bc.restart, bc.git_refresh"
+            echo -e "  Other: bc.show_environment, bc.ssh, bc.help"
             echo
-            echo -e "${YELLOW}Usage:${NC}"
-            echo "  source $0"
-            echo "  bc.create_record --help"
-            echo "  bc.help"
-            echo
-            echo -e "${YELLOW}Example:${NC}"
-            if [ ${#DOMAINS[@]} -gt 0 ]; then
-                echo "  bc.create_record webserver ${DOMAINS[0]} 172.25.50.100"
-            else
-                echo "  bc.create_record webserver example.com 172.25.50.100"
-            fi
+            echo "  source $0   then   bc.help"
             ;;
     esac
 }
@@ -1256,9 +1304,14 @@ __check_zones() {
     return $errors
 }
 
-# When sourced, show load message (skip when run as script)
+# When sourced, show load message and set aliases (skip when run as script)
 if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
     echo "⚓ BindCaptain loaded. Type 'bc.help' for usage."
+    alias bc.a='bc.create'
+    alias bc.ls='bc.list'
+    alias bc.rm='bc.delete'
+    alias bc.cname='bc.create_cname'
+    alias bc.txt='bc.create_txt'
 fi
 
 # Direct command line interface
