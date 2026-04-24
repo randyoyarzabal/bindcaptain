@@ -445,6 +445,8 @@ show_help() {
     echo
     echo "Example:"
     echo "  ./run-tests.sh"
+    echo "  ./tests/driver.sh                    # fast default (skips container build)"
+    echo "  ./tests/driver.sh --live --host root@wolfman.example.com"
     echo "  SKIP_CONTAINER_TESTS=1 ./run-tests.sh"
     echo "  BC_LIVE_TESTS=1 BC_HOST=root@wolfman.reonetlabs.us ./run-tests.sh"
 }
