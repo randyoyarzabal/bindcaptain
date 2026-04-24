@@ -171,6 +171,19 @@ __backup_zone() {
     fi
 }
 
+# Append under the zone apex. Files may end inside another $ORIGIN (e.g. lab.zone under
+# the same db); a bare hostname there would be relative to that origin, not $domain.
+__append_zone_record() {
+    local zone_file="$1"
+    local domain="$2"
+    local record_line="$3"
+    {
+        echo ""
+        echo "\$ORIGIN ${domain}."
+        echo "$record_line"
+    } >> "$zone_file"
+}
+
 # Increment serial number
 __increment_serial() {
     local zone_file=$1
@@ -463,7 +476,7 @@ bc.create_record() {
     elif grep -q "; A Records" "$zone_file"; then
         sed -i "/; A Records/a\\$record_line" "$zone_file"
     else
-        echo "$record_line" >> "$zone_file"
+        __append_zone_record "$zone_file" "$domain" "$record_line"
     fi
     
     # Increment serial and validate
@@ -618,7 +631,7 @@ bc.create_cname() {
         # Insert after A Records section
         sed -i "/; A Records/,/^$/a\\$record_line" "$zone_file"
     else
-        echo "$record_line" >> "$zone_file"
+        __append_zone_record "$zone_file" "$domain" "$record_line"
     fi
     
     # Increment serial and validate
@@ -721,8 +734,8 @@ bc.create_txt() {
     # Add new TXT record
     local record_line="${name}                 IN      TXT     \"${text_value}\""
     
-    # Find the right place to insert (append to end of file)
-    echo "$record_line" >> "$zone_file"
+    # Append under zone apex (zone file may end inside a delegated $ORIGIN)
+    __append_zone_record "$zone_file" "$domain" "$record_line"
     
     # Increment serial and validate
     __increment_serial "$zone_file"

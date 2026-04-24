@@ -28,17 +28,20 @@ Set these **before** sourcing the plugin, or edit the defaults inside `bc_chief-
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| **`BC_HOST`** | SSH target: `user@host`. Must be able to `sudo` on the remote. | `root@wolfman.homelab.io` |
+| **`BC_HOST`** | If set, SSH target `user@host` (must be able to `sudo` there). If unset, commands run **on the current machine** (for Chief on the DNS host). | *(unset — local)* |
 | **`BC_MANAGER`** | Absolute path to `bindcaptain_manager.sh` on the **remote** host. | `/opt/bindcaptain/tools/bindcaptain_manager.sh` |
 
 ### Overriding without editing the file
 
 ```bash
+# Only when Chief runs on another machine than BindCaptain:
 export BC_HOST="root@dns.example.com"
 export BC_MANAGER="/opt/bindcaptain/tools/bindcaptain_manager.sh"
 # Then load the plugin (e.g. Chief does this automatically for the bc plugin)
 source /path/to/bc_chief-plugin.sh
 ```
+
+When Chief runs **on** the BindCaptain host (e.g. root on `wolfman`), do **not** set `BC_HOST` so `bc.list` / `bc.status` run locally without SSH.
 
 ## Installation
 
@@ -49,6 +52,16 @@ source /path/to/bc_chief-plugin.sh
 2. **Set `BC_HOST` and `BC_MANAGER`** for your BindCaptain server (see above).
 3. **Load the plugin** (e.g. start a new Chief shell or run `chief.plugin bc` if your Chief supports it).
 4. Run `bc.help` to confirm and see usage.
+
+### Reloading plugins in an existing shell
+
+Chief keeps sourced plugins in the **current** shell. If you change `bc_chief-plugin.sh` on disk, or you open a session that started before the plugin was available, `bc.status` and other `bc.*` names may be undefined until you reload:
+
+```text
+chief.reload
+```
+
+If your Chief build uses a different command for the same action, use that instead of starting a subshell that never loaded the plugin.
 
 ## Commands (summary)
 
@@ -104,6 +117,9 @@ bc.ssh
 - Service commands run `systemctl` and `podman` on the remote.
 
 ## Troubleshooting
+
+- **`bc.status`, `bc.list`, or `bc.*` not found** (interactive Chief session)  
+  The `bc` plugin may not be loaded in that shell yet, or you updated the plugin file after Chief started. Run **`chief.reload`** (or open a new Chief login session), then `bc.help`.
 
 - **“Cannot connect to $BC_HOST”**  
   Check SSH from your machine: `ssh $BC_HOST`. Ensure key-based auth or agent is set up so the plugin can connect without a password.

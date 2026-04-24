@@ -27,9 +27,10 @@
 #   - SSH key-based auth recommended (no password prompt for automation).
 #
 # CONFIGURATION (set before sourcing or edit below)
-#   BC_HOST   - SSH target: user@host (e.g. root@dns.example.com).
-#   BC_MANAGER - Absolute path to bindcaptain_manager.sh on the remote host
-#                (e.g. /opt/bindcaptain/tools/bindcaptain_manager.sh).
+#   BC_HOST    - Optional. If set (e.g. root@dns.example.com), commands run over SSH.
+#                If unset or empty, commands run on this machine (Chief on the DNS host).
+#                Legacy placeholder root@your-bindcaptain-host is treated as unset.
+#   BC_MANAGER - Absolute path to bindcaptain_manager.sh (default below).
 #
 #   To override: export BC_HOST and/or BC_MANAGER before loading the plugin, or
 #   copy this file and change the default values below.
@@ -38,6 +39,7 @@
 #   Ensure this file is installed as a Chief user plugin named "bc" (e.g. so
 #   Chief loads it as the bc plugin). Edit with: chief.plugin bc
 #   See Chief GitHub (link above) for plugin installation details.
+#   After changing this file or if bc.* is missing in an open shell: chief.reload
 #
 # COMMANDS (see bc.help after loading)
 #   bc.create, bc.create_cname, bc.create_txt  - Create DNS records
@@ -59,19 +61,33 @@ fi
 # -----------------------------------------------------------------------------
 # Configuration (customize for your BindCaptain host)
 # -----------------------------------------------------------------------------
-BC_HOST="${BC_HOST:-root@your-bindcaptain-host}"
+BC_HOST="${BC_HOST:-}"
+# Older copies shipped a fake host; treat as "run locally" so Chief on the DNS box works.
+[[ "$BC_HOST" == "root@your-bindcaptain-host" ]] && BC_HOST=""
 BC_MANAGER="${BC_MANAGER:-/opt/bindcaptain/tools/bindcaptain_manager.sh}"
 
-# Internal function to execute remote commands
+# Run a shell command on the BindCaptain host (SSH when BC_HOST is set, else this machine).
 _bc_ssh() {
-  ssh -q "$BC_HOST" "$@"
+  if [[ -n "$BC_HOST" ]]; then
+    ssh -q "$BC_HOST" "$@"
+  else
+    bash -c "$*"
+  fi
 }
 
-# Internal function to check if remote host is reachable
 _bc_check_connection() {
-  if ! ssh -q -o ConnectTimeout=3 "$BC_HOST" "exit" 2>/dev/null; then
-    echo "✗ Error: Cannot connect to $BC_HOST"
-    echo "  Ensure the host is reachable and SSH (e.g. key-based) is configured."
+  if [[ -n "$BC_HOST" ]]; then
+    if ! ssh -q -o ConnectTimeout=3 "$BC_HOST" "exit" 2>/dev/null; then
+      echo "✗ Error: Cannot connect to $BC_HOST"
+      echo "  Ensure the host is reachable and SSH (e.g. key-based) is configured."
+      echo "  To run on this machine only, unset BC_HOST before loading the plugin."
+      return 1
+    fi
+    return 0
+  fi
+  if [[ ! -r "$BC_MANAGER" ]]; then
+    echo "✗ Error: Local mode (BC_HOST unset) but BC_MANAGER is missing or unreadable:"
+    echo "  $BC_MANAGER"
     return 1
   fi
   return 0
@@ -88,9 +104,8 @@ NC='\033[0m' # No Color
 function bc.help() {
   echo -e "${CYAN}⚓BindCaptain${NC} - Chief Plugin"
   echo
-  echo "  Remote ⚓BindCaptain management: commands run on the host configured in BC_HOST"
-  echo "  via SSH. Use this to manage DNS and the ⚓BindCaptain service from your local"
-  echo "  machine without logging into the server."
+  echo "  ⚓BindCaptain management: if BC_HOST is set, commands run there via SSH; if BC_HOST"
+  echo "  is unset, commands run on this machine (useful when Chief runs on the DNS host)."
   echo
   echo "  Chief is a separate project. For more info (what it is, how to install, plugins):"
   echo "  https://github.com/randyoyarzabal/chief"
@@ -120,7 +135,11 @@ function bc.help() {
   echo "  bc.refresh"
   echo
   echo -e "${YELLOW}Configuration (current):${NC}"
-  echo "  BC_HOST:    $BC_HOST"
+  if [[ -n "$BC_HOST" ]]; then
+    echo "  BC_HOST:    $BC_HOST  (SSH remote)"
+  else
+    echo "  BC_HOST:    (unset — local shell, no SSH)"
+  fi
   echo "  BC_MANAGER: $BC_MANAGER"
 }
 
@@ -329,6 +348,10 @@ Open an SSH connection to the ⚓BindCaptain host ($BC_HOST)."
     return 0
   fi
   
+  if [[ -z "$BC_HOST" ]]; then
+    echo -e "${CYAN}BC_HOST is unset — you are already on the BindCaptain host (local mode).${NC}"
+    return 0
+  fi
   _bc_check_connection || return 1
   
   echo "Connecting to $BC_HOST..."
@@ -347,7 +370,11 @@ Show ⚓BindCaptain service status and environment information."
   
   _bc_check_connection || return 1
   
-  echo "⚓BindCaptain status on $BC_HOST:"
+  if [[ -n "$BC_HOST" ]]; then
+    echo "⚓BindCaptain status on $BC_HOST:"
+  else
+    echo "⚓BindCaptain status (this host):"
+  fi
   echo "=========================================="
   _bc_ssh "sudo systemctl status bindcaptain --no-pager -l"
   echo ""
