@@ -121,6 +121,16 @@ bc.create_record|bc.create_cname|bc.create_txt|bc.delete_record|bc.list_records
 
 > **Complete command reference?** See [Cheat Sheet](docs/cheat-sheet.md) for all available commands and examples.
 
+### Git: push to GitHub and Fluxmire Gitea
+
+After cloning, run once so **`git push origin`** updates **both** [GitHub](https://github.com/randyoyarzabal/bindcaptain) and Fluxmire Gitea (`ssh://git@git.fluxmire.io:2222/homelab/bindcaptain.git`):
+
+```bash
+./tools/setup-git-dual-push.sh
+```
+
+The named **`gitea`** remote is unchanged if you use **`git fetch gitea`** separately.
+
 ## Features
 
 - **Deploy in Minutes** - 3-step setup process
