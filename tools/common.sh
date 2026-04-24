@@ -207,19 +207,50 @@ validate_bind_config() {
         print_status "error" "Configuration file not found: $config_file"
         return 1
     fi
-    
-    local check_path="$config_file"
-    if ! is_container && is_container_running; then
-        # When we exec into the container, use the path inside the container (mount is at /etc/named.conf)
-        check_path="${CONTAINER_NAMED_CONF:-/etc/named.conf}"
-    fi
-    if exec_in_context "named-checkconf $check_path"; then
-        print_status "success" "BIND configuration is valid"
-        return 0
-    else
+
+    # Container context: validate directly against the container-visible path.
+    if is_container; then
+        if named-checkconf "$config_file"; then
+            print_status "success" "BIND configuration is valid"
+            return 0
+        fi
         print_status "error" "BIND configuration is invalid"
         return 1
     fi
+
+    # Host with running container: execute named-checkconf inside that container.
+    if is_container_running; then
+        local check_path="${CONTAINER_NAMED_CONF:-/etc/named.conf}"
+        if podman exec "$CONTAINER_NAME" named-checkconf "$check_path"; then
+            print_status "success" "BIND configuration is valid"
+            return 0
+        fi
+        print_status "error" "BIND configuration is invalid"
+        return 1
+    fi
+
+    # Host with container stopped: validate using the bindcaptain image, so we don't
+    # require bind-utils on the host.
+    if command -v podman >/dev/null 2>&1 && podman image exists "localhost/bindcaptain:latest" >/dev/null 2>&1; then
+        if podman run --rm \
+            --entrypoint /usr/sbin/named-checkconf \
+            -v "$config_file:/etc/named.conf:ro,Z" \
+            localhost/bindcaptain:latest /etc/named.conf; then
+            print_status "success" "BIND configuration is valid"
+            return 0
+        fi
+        print_status "error" "BIND configuration is invalid"
+        return 1
+    fi
+
+    # Last-resort fallback if bind-utils is installed on host.
+    if command -v named-checkconf >/dev/null 2>&1 && named-checkconf "$config_file"; then
+        print_status "success" "BIND configuration is valid"
+        return 0
+    fi
+
+    print_status "error" "BIND configuration is invalid (no validation runtime available)"
+    return 1
 }
 
 # Discover domains from named.conf
