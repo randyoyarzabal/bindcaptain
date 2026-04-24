@@ -269,7 +269,11 @@ Examples:
     local domain="$2"
     local type="${3:-}"
     echo "Deleting record: ${hostname}.${domain} ${type}"
-    _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.delete_record \"$hostname\" \"$domain\" \"$type\"'"
+    if [[ -n $type ]]; then
+      _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.delete_record \"$hostname\" \"$domain\" \"$type\"'"
+    else
+      _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.delete_record \"$hostname\" \"$domain\"'"
+    fi
   fi
 }
 

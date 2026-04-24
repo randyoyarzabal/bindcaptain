@@ -525,7 +525,7 @@ bc.create_record() {
     echo
     
     # Validations
-    if ! validate_hostname "$hostname"; then
+    if ! validate_relative_dns_name "$hostname"; then
         print_status "error" "Invalid hostname: $hostname"
         return 1
     fi
@@ -545,8 +545,8 @@ bc.create_record() {
         zone_file="$BIND_DIR/${domain}.db"
     fi
     
-    # Check if record already exists
-    if grep -q "^${hostname}\s" "$zone_file"; then
+    # Match RR owner: first field equals hostname (zone-relative label chain)
+    if grep -qE "^${hostname//./\\.}[[:space:]]" "$zone_file"; then
         print_status "warning" "Record $hostname already exists in $domain"
         
         # In non-interactive mode, fail rather than overwrite
@@ -561,8 +561,9 @@ bc.create_record() {
                 return 0
             fi
         fi
-        # Remove existing record
-        sed -i "/^${hostname}\s/d" "$zone_file"
+        # Remove existing record (escape . for sed)
+        local _hn_esc="${hostname//./\\.}"
+        sed -i "/^${_hn_esc}[[:space:]]/d" "$zone_file"
     fi
     
     # Backup zone file
@@ -684,7 +685,7 @@ bc.create_cname() {
     echo
     
     # Validations
-    if ! validate_hostname "$alias"; then
+    if ! validate_relative_dns_name "$alias"; then
         print_status "error" "Invalid alias: $alias"
         return 1
     fi
@@ -699,8 +700,7 @@ bc.create_cname() {
         zone_file="$BIND_DIR/${domain}.db"
     fi
     
-    # Check if record already exists
-    if grep -q "^${alias}\s" "$zone_file"; then
+    if grep -qE "^${alias//./\\.}[[:space:]]" "$zone_file"; then
         print_status "warning" "Record $alias already exists in $domain"
         
         # In non-interactive mode, fail rather than overwrite
@@ -716,7 +716,8 @@ bc.create_cname() {
             fi
         fi
         # Remove existing record
-        sed -i "/^${alias}\s/d" "$zone_file"
+        local _al_esc="${alias//./\\.}"
+        sed -i "/^${_al_esc}[[:space:]]/d" "$zone_file"
     fi
     
     # Backup zone file
@@ -814,7 +815,7 @@ bc.create_txt() {
     echo
     
     # Validations
-    if [ "$name" != "@" ] && ! validate_hostname "$name"; then
+    if [ "$name" != "@" ] && ! validate_relative_dns_name "$name"; then
         print_status "error" "Invalid name: $name"
         return 1
     fi

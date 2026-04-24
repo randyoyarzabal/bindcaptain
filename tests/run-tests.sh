@@ -107,7 +107,7 @@ test_project_structure() {
     local required_files=(
         "bindcaptain.sh"
         "tools/bindcaptain_manager.sh"
-        "tools/bindcaptain_refresh.sh"
+        "chief-plugin/bc_chief-plugin.sh"
         "Containerfile"
         "tools/config-setup.sh"
         "README.md"
@@ -144,8 +144,9 @@ test_script_syntax() {
     local scripts=(
         "bindcaptain.sh"
         "tools/bindcaptain_manager.sh"
-        "tools/bindcaptain_refresh.sh"
         "tools/config-setup.sh"
+        "chief-plugin/bc_chief-plugin.sh"
+        "tests/test-bc-crud-live.sh"
     )
     
     for script in "${scripts[@]}"; do
@@ -283,7 +284,7 @@ test_documentation() {
         "BindCaptain"
         "Features"
         "Quick Start"
-        "Management Commands"
+        "DNS Management"
     )
     
     for section in "${required_sections[@]}"; do
@@ -299,9 +300,8 @@ test_documentation() {
         return 1
     fi
     
-    # Check for domain-based organization documentation
-    if ! grep -q "config-examples/" "$PROJECT_DIR/README.md"; then
-        test_fail "Documentation" "Missing config-examples documentation"
+    if ! grep -qE "example\.com|wizard|zone" "$PROJECT_DIR/README.md"; then
+        test_fail "Documentation" "README should mention zones or setup wizard"
         return 1
     fi
     
@@ -359,6 +359,24 @@ test_security() {
     test_pass "Security Best Practices"
 }
 
+# Live bc.* CRUD against real zones (reonetlabs.us, fluxmire.io, homelab.io).
+# Requires BC_LIVE_TESTS=1. Set BC_HOST when running from a workstation (e.g. root@wolfman.reonetlabs.us).
+test_bc_live_crud() {
+    if [[ "${BC_LIVE_TESTS:-}" != "1" ]]; then
+        echo -e "${YELLOW}[!] SKIP: bc.* live CRUD (set BC_LIVE_TESTS=1; optional BC_HOST for SSH)${NC}"
+        return 0
+    fi
+
+    test_start "bc.* live CRUD (BIND zones)"
+
+    if ! bash "$SCRIPT_DIR/test-bc-crud-live.sh"; then
+        test_fail "bc.* live CRUD (BIND zones)" "test-bc-crud-live.sh exited non-zero"
+        return 1
+    fi
+
+    test_pass "bc.* live CRUD (BIND zones)"
+}
+
 # Main test execution
 main() {
     print_header
@@ -375,9 +393,14 @@ main() {
     # Run all tests
     test_project_structure
     test_script_syntax
+    test_bc_live_crud
     test_example_configs
-    test_container_build
-    test_container_startup
+    if [[ "${SKIP_CONTAINER_TESTS:-}" == "1" ]]; then
+        echo -e "${YELLOW}[!] SKIP: container build/startup (SKIP_CONTAINER_TESTS=1)${NC}"
+    else
+        test_container_build
+        test_container_startup
+    fi
     test_documentation
     test_license
     test_security
@@ -417,10 +440,13 @@ show_help() {
     echo "Environment Variables:"
     echo "  SKIP_CONTAINER_TESTS  Skip container build/startup tests"
     echo "  SKIP_BIND_TESTS      Skip BIND configuration validation tests"
+    echo "  BC_LIVE_TESTS=1      Run live bc.* CRUD tests (SSH/local via chief-plugin; needs zones)"
+    echo "  BC_HOST              SSH target for live tests (e.g. root@wolfman.reonetlabs.us)"
     echo
     echo "Example:"
     echo "  ./run-tests.sh"
     echo "  SKIP_CONTAINER_TESTS=1 ./run-tests.sh"
+    echo "  BC_LIVE_TESTS=1 BC_HOST=root@wolfman.reonetlabs.us ./run-tests.sh"
 }
 
 # Parse command line arguments
