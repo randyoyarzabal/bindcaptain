@@ -124,6 +124,107 @@ __parse_fqdn() {
     return 0
 }
 
+# Lowercase and strip trailing dots for FQDN comparison
+__dns_normalize() {
+    echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/\.*$//'
+}
+
+# Build zone file without matching RRs; list removed lines in match_ref file.
+# Args: zone_file apex_domain target_fqdn (normalized or not) rrtype_filter keep_varname match_varname (namerefs).
+# Returns 1 if no RR matched (temp files removed).
+__zone_fqdn_delete_prepare() {
+    local zone_file="$1"
+    local d="$2"
+    local target_fqdn
+    target_fqdn=$(__dns_normalize "$3")
+    local rrtype_filter="${4:-}"
+    local -n keep_ref="$5"
+    local -n match_ref="$6"
+
+    keep_ref=$(mktemp) || return 1
+    match_ref=$(mktemp) || return 1
+
+    local current_origin="${d}."
+    local in_multiline=false
+    local removed=0
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        local original_line="$line"
+        [[ "$line" =~ ^[[:space:]]*# ]] && { printf '%s\n' "$original_line" >>"$keep_ref"; continue; }
+        [[ "$line" =~ ^[[:space:]]*\; ]] && { printf '%s\n' "$original_line" >>"$keep_ref"; continue; }
+        [[ -z "${line// }" ]] && { printf '%s\n' "$original_line" >>"$keep_ref"; continue; }
+
+        if [[ "$in_multiline" == true ]]; then
+            printf '%s\n' "$original_line" >>"$keep_ref"
+            [[ "$line" =~ \) ]] && in_multiline=false
+            continue
+        fi
+
+        if [[ "$line" =~ ^\$ORIGIN[[:space:]]+(.+) ]]; then
+            current_origin="${BASH_REMATCH[1]}"
+            [[ ! "$current_origin" =~ \.$ ]] && current_origin="${current_origin}."
+            printf '%s\n' "$original_line" >>"$keep_ref"
+            continue
+        fi
+
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        local name type value
+        if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+IN[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+            name="${BASH_REMATCH[1]}"
+            type="${BASH_REMATCH[2]}"
+            value="${BASH_REMATCH[3]}"
+        elif [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+            name="${BASH_REMATCH[1]}"
+            type="${BASH_REMATCH[2]}"
+            value="${BASH_REMATCH[3]}"
+        else
+            printf '%s\n' "$original_line" >>"$keep_ref"
+            continue
+        fi
+
+        if [ "$type" == "SOA" ]; then
+            printf '%s\n' "$original_line" >>"$keep_ref"
+            [[ "$value" =~ \( ]] && in_multiline=true
+            continue
+        fi
+
+        if [ "$type" == "NS" ] && { [ "$name" == "@" ] || [ "$name" == "$d" ]; }; then
+            printf '%s\n' "$original_line" >>"$keep_ref"
+            continue
+        fi
+
+        if [ -n "$rrtype_filter" ] && [ "$type" != "$rrtype_filter" ]; then
+            printf '%s\n' "$original_line" >>"$keep_ref"
+            continue
+        fi
+
+        local fqdn
+        if [[ "$name" == "@" ]]; then
+            fqdn="$d"
+        elif [[ "$name" =~ \.$ ]]; then
+            fqdn="${name%.}"
+        elif [[ "$current_origin" == "$d." ]]; then
+            fqdn="${name}.${d}"
+        else
+            fqdn="${name}.${current_origin%.}"
+        fi
+        fqdn=$(__dns_normalize "$fqdn")
+
+        if [[ "$fqdn" == "$target_fqdn" ]]; then
+            printf '%s\n' "$original_line" >>"$match_ref"
+            removed=$((removed + 1))
+            continue
+        fi
+        printf '%s\n' "$original_line" >>"$keep_ref"
+    done <"$zone_file"
+
+    if [ "$removed" -eq 0 ]; then
+        rm -f "$keep_ref" "$match_ref"
+        return 1
+    fi
+    return 0
+}
+
 # Custom header for this script
 __print_manager_header() {
     print_header "⚓BindCaptain" "(Container-aware DNS Management)"
@@ -803,12 +904,14 @@ bc.delete_record() {
         echo "  bc.delete_record webserver ${DOMAINS[0]:-example.com}"
         echo "  bc.delete_record www.${DOMAINS[0]:-example.com} CNAME"
         echo "  bc.delete_record --backup webserver ${DOMAINS[0]:-example.com}"
+        echo "  bc.delete_record host.lab.${DOMAINS[0]:-example.com}   # multi-label names under \$ORIGIN"
         return 0
     fi
     
     # Parse arguments - support both FQDN and name+domain formats
     local name domain record_type
-    if [ $# -eq 1 ] || ( [ $# -eq 2 ] && [[ "$2" =~ ^[A-Z]+$ ]] ); then
+    # Chief (and some shells) pass a second empty argument for optional type; treat as single-arg FQDN.
+    if [ $# -eq 1 ] || ( [ $# -eq 2 ] && [[ -z "$2" ]] ) || ( [ $# -eq 2 ] && [[ "$2" =~ ^[A-Z]+$ ]] ); then
         # FQDN format: <fqdn> [record_type]
         read name domain <<< $(__parse_fqdn "$1")
         record_type=${2:-""}
@@ -818,7 +921,7 @@ bc.delete_record() {
             print_status "error" "Could not parse domain from '$1'. Available domains: ${DOMAINS[*]}"
             return 1
         fi
-    elif [ $# -ge 2 ]; then
+    elif [ $# -ge 2 ] && [[ -n "$2" ]]; then
         # Traditional format: <name> <domain> [record_type]
         name=$1
         domain=$2
@@ -836,8 +939,8 @@ bc.delete_record() {
     [ -n "$record_type" ] && echo "Type: $record_type"
     echo
     
-    # Validations
-    if ! validate_hostname "$name"; then
+    # Validations (multi-label relative names allowed, e.g. mactest.lab under fluxmire.io)
+    if ! validate_relative_dns_name "$name"; then
         print_status "error" "Invalid name: $name"
         return 1
     fi
@@ -852,20 +955,22 @@ bc.delete_record() {
         zone_file="$BIND_DIR/${domain}.db"
     fi
     
-    # Check if record exists
-    local search_pattern="^${name}\s"
-    if [ -n "$record_type" ]; then
-        search_pattern="^${name}\s.*IN\s*${record_type}\s"
+    local target_fqdn
+    if [[ "$name" == "@" ]]; then
+        target_fqdn=$(__dns_normalize "$domain")
+    else
+        target_fqdn=$(__dns_normalize "${name}.${domain}")
     fi
     
-    if ! grep -q "$search_pattern" "$zone_file"; then
-        print_status "error" "Record $name not found in $domain"
+    local keep_tmp match_tmp
+    if ! __zone_fqdn_delete_prepare "$zone_file" "$domain" "$target_fqdn" "$record_type" keep_tmp match_tmp; then
+        print_status "error" "Record not found: ${target_fqdn} (in zone $domain)"
         return 1
     fi
     
     # Show what will be deleted
     echo -e "${YELLOW}Records to be deleted:${NC}"
-    grep "$search_pattern" "$zone_file"
+    cat "$match_tmp"
     echo
     
     # In non-interactive mode, delete without prompting (delete is explicit action)
@@ -875,6 +980,7 @@ bc.delete_record() {
         read -p "Delete these records? (y/N): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            rm -f "$keep_tmp" "$match_tmp"
             print_status "info" "Operation cancelled"
             return 0
         fi
@@ -883,16 +989,17 @@ bc.delete_record() {
     # Backup zone file
     __backup_zone "$domain"
     
-    # Delete records
-    sed -i "/$search_pattern/d" "$zone_file"
+    # Apply zone without matched lines
+    mv "$keep_tmp" "$zone_file"
+    rm -f "$match_tmp"
     
     # Increment serial and validate
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
         __reload_bind
-        print_status "success" "Record(s) deleted: $name from $domain"
-        __log_action "Deleted record: $name from $domain"
+        print_status "success" "Record(s) deleted: $target_fqdn"
+        __log_action "Deleted record: $target_fqdn"
     else
         print_status "error" "Zone validation failed, restoring backup"
         # Restore from backup

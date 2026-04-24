@@ -254,11 +254,15 @@ Examples:
   
   # Support both FQDN and hostname+domain formats
   if [[ -z $2 ]] || [[ $2 =~ ^[A-Z]+$ ]]; then
-    # FQDN format: <fqdn> [type]
+    # FQDN format: <fqdn> [type] — do not pass an empty second arg (remote shell would see $#=2 as name+domain).
     local fqdn="$1"
     local type="${2:-}"
     echo "Deleting record: ${fqdn} ${type}"
-    _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.delete_record \"$fqdn\" \"$type\"'"
+    if [[ -n $type ]]; then
+      _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.delete_record \"$fqdn\" \"$type\"'"
+    else
+      _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.delete_record \"$fqdn\"'"
+    fi
   else
     # Traditional format: <hostname> <domain> [type]
     local hostname="$1"

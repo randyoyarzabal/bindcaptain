@@ -141,6 +141,21 @@ validate_hostname() {
     return 0
 }
 
+# Validate a relative owner name (one or more DNS labels), e.g. mactest or mactest.lab or @
+validate_relative_dns_name() {
+    local n="$1"
+    [[ "$n" == "@" ]] && return 0
+    [[ -z "$n" ]] && return 1
+    local IFS='.'
+    local -a parts
+    read -ra parts <<< "$n"
+    local p
+    for p in "${parts[@]}"; do
+        [[ "$p" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$ ]] || return 1
+    done
+    return 0
+}
+
 # Check if container is running
 is_container_running() {
     if command -v podman &> /dev/null; then
