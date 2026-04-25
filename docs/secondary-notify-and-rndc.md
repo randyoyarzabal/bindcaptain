@@ -22,7 +22,7 @@ Authoritative secondaries (including Synology DNS Server) need:
 
 ## “Instant” updates vs TTL
 
-- **This nameserver (172.25.50.156):** After `bc` changes a zone file, BindCaptain runs **`rndc reload <zone>`** for the affected zone(s) so in-memory data matches the file **immediately** on that host.
+- **This nameserver (172.25.50.156):** After `bc` changes a zone file, BindCaptain runs **`sync`** (flush disk) then **`rndc reload`** (full) so in-memory data matches the file **on that host** as soon as BIND finishes reload.
 - **Other clients / 8.8.8.8 / your laptop’s “default” DNS:** Those still follow **TTL** from the last cached answer. That can be **hours** (e.g. 86400). For a true end-to-end check, query the authoritative address: `dig @172.25.50.156 name.example.com A`.
 
 ## One-time: enable rndc (recommended)
