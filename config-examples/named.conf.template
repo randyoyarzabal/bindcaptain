@@ -50,6 +50,11 @@ options {
     // include "/etc/crypto-policies/back-ends/bind.config";
 };
 
+// Optional: rndc for reload/reconfig (container image provides /etc/rndc.key).
+// Copy the block from config-examples/named-fragment-rndc.conf before
+// include "/etc/named.root.key", then run tools/ensure-rndc-controls.sh and
+// restart the container once. See docs/secondary-notify-and-rndc.md.
+
 // Improved logging configuration
 logging {
     channel default_file {

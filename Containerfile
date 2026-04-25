@@ -80,8 +80,10 @@ RUN chown -R named:named /var/named /var/log/named /var/run/named && \
     chmod 644 /var/named/* && \
     chmod 755 /usr/local/scripts
 
-# Create rndc key if not exists
+# Create rndc key if not exists (named must be able to read the key if named.conf
+# include "/etc/rndc.key" is used with a controls { } block; default is root-only.)
 RUN rndc-confgen -a || true
+RUN if [ -f /etc/rndc.key ]; then chown root:named /etc/rndc.key && chmod 640 /etc/rndc.key; fi
 
 # Expose DNS ports
 EXPOSE 53/udp 53/tcp 953/tcp

@@ -120,6 +120,19 @@ prepare_config() {
     print_status "success" "Configuration prepared for direct mounting"
 }
 
+# rndc key in the image is created root-only; if named.conf includes it, chown
+# to root:named + chmod 640. Safe to run on every start (existing images).
+fix_rndc_key_perms_in_container() {
+    if ! command -v podman &> /dev/null; then
+        return 0
+    fi
+    if podman ps --format "{{.Names}}" 2>/dev/null | grep -q "^${CONTAINER_NAME}$"; then
+        podman exec "$CONTAINER_NAME" sh -c 'test -f /etc/rndc.key && chown root:named /etc/rndc.key && chmod 640 /etc/rndc.key' 2>/dev/null && \
+            print_status "info" "rndc key perms: root:named/640" || true
+    fi
+    return 0
+}
+
 # No longer needed - mounting directly from source
 
 # Auto-detect bind IP from named.conf
@@ -468,6 +481,7 @@ main() {
             build_container
             prepare_config
             run_container
+            fix_rndc_key_perms_in_container
             check_status
             show_info
             ;;
@@ -490,6 +504,7 @@ main() {
             if podman restart "$CONTAINER_NAME" 2>/dev/null; then
                 print_status "success" "Container restarted"
                 sleep 5
+                fix_rndc_key_perms_in_container
                 check_status
             else
                 print_status "error" "Failed to restart container"
