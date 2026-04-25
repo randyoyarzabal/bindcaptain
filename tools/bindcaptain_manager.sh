@@ -309,6 +309,16 @@ __increment_serial() {
     print_status "info" "Updated serial number to $new_serial"
 }
 
+# Reload BIND after zone changes; require success so callers do not report "created" when
+# nothing was reloaded (or when the container restart fallback still failed).
+__reload_bind_required() {
+    if ! __reload_bind; then
+        print_status "error" "Zone files were updated on disk, but BIND reload failed. The running service may be stale, stopped, or the container in a bad state. Check: podman ps -a --filter name=$CONTAINER_NAME, podman logs $CONTAINER_NAME, and /usr/sbin/rndc status inside the container."
+        return 1
+    fi
+    return 0
+}
+
 # Reload BIND (container-aware)
 __reload_bind() {
     if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
@@ -589,7 +599,9 @@ bc.create_record() {
         __create_ptr_record "$ip_address" "$hostname" "$domain"
         
         # Reload BIND to pick up both forward and reverse zone changes
-        __reload_bind
+        if ! __reload_bind_required; then
+            return 1
+        fi
         
         print_status "success" "A record created: $hostname.$domain -> $ip_address"
         __log_action "Created A record: $hostname.$domain -> $ip_address"
@@ -740,7 +752,9 @@ bc.create_cname() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        __reload_bind
+        if ! __reload_bind_required; then
+            return 1
+        fi
         print_status "success" "CNAME record created: $alias.$domain -> $target"
         __log_action "Created CNAME record: $alias.$domain -> $target"
     else
@@ -843,7 +857,9 @@ bc.create_txt() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        __reload_bind
+        if ! __reload_bind_required; then
+            return 1
+        fi
         print_status "success" "TXT record created: $name.$domain -> \"$text_value\""
         __log_action "Created TXT record: $name.$domain -> \"$text_value\""
     else
@@ -998,7 +1014,9 @@ bc.delete_record() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        __reload_bind
+        if ! __reload_bind_required; then
+            return 1
+        fi
         print_status "success" "Record(s) deleted: $target_fqdn"
         __log_action "Deleted record: $target_fqdn"
     else
