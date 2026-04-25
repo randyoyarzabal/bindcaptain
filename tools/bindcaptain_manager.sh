@@ -1356,6 +1356,10 @@ bc.git_refresh() {
         return 1
     }
     echo -e "${GREEN}✓ ⚓BindCaptain updated${NC}"
+    if command -v podman &>/dev/null && is_container_running; then
+        print_status "info" "Reloading BIND so any pulled zone/config changes take effect…"
+        __reload_bind_required || print_status "warning" "Reload failed; run bc.refresh after fixing rndc/container"
+    fi
 }
 # No-op when already on host (plugin uses this to open SSH)
 bc.ssh() {
@@ -1421,24 +1425,36 @@ __refresh_dns() {
     __print_manager_header
     __log_action "Starting DNS refresh process (container-aware)"
     
-    # Ensure proper ownership of zone files
-    __log_action "Ensuring proper ownership of zone files in $BIND_DIR"
+    # Ensure proper ownership of zone files (including domain subdirs, e.g. homelab.io/homelab.io.db)
+    __log_action "Ensuring proper ownership of zone files under $BIND_DIR"
     if [ -d "$BIND_DIR" ]; then
         if is_container; then
-            # Running inside container
-            chown named:named "$BIND_DIR"/*.db 2>/dev/null || true
-            chmod 644 "$BIND_DIR"/*.db 2>/dev/null || true
+            find "$BIND_DIR" -name '*.db' -exec chown named:named {} + 2>/dev/null || true
+            find "$BIND_DIR" -name '*.db' -exec chmod 644 {} + 2>/dev/null || true
         else
-            # Running on host
-            chown 25:25 "$BIND_DIR"/*.db 2>/dev/null || true
-            chmod 644 "$BIND_DIR"/*.db 2>/dev/null || true
+            find "$BIND_DIR" -name '*.db' -exec chown 25:25 {} + 2>/dev/null || true
+            find "$BIND_DIR" -name '*.db' -exec chmod 644 {} + 2>/dev/null || true
+        fi
+        if [ -f "$NAMED_CONF" ]; then
+            if is_container; then
+                chown root:named "$NAMED_CONF" 2>/dev/null || chown root:root "$NAMED_CONF" 2>/dev/null || true
+            else
+                chown 25:25 "$NAMED_CONF" 2>/dev/null || true
+            fi
+            chmod 644 "$NAMED_CONF" 2>/dev/null || true
         fi
     fi
     
-    # Check configuration and zones
+    # Check configuration and zones, then full rndc reload so in-memory data matches disk and
+    # NOTIFY is sent to secondaries (same path as after bc.create_record / bc.delete_record).
     if validate_bind_config && __check_zones; then
         __log_action "Configuration and zone validation passed"
-        print_status "success" "DNS refresh completed successfully"
+        if ! __reload_bind_required; then
+            __log_action "ERROR: BIND reload after refresh failed"
+            print_status "error" "Configuration is valid but BIND reload failed (check rndc and container)"
+            return 1
+        fi
+        print_status "success" "DNS refresh completed (BIND reloaded; slaves notified per named.conf)"
     else
         __log_action "ERROR: Configuration or zone validation failed"
         print_status "error" "DNS refresh failed - check configuration"
