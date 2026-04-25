@@ -112,7 +112,7 @@ function bc.help() {
   echo
   echo -e "${WHITE}Available Commands:${NC}"
   echo
-  echo -e "  ${GREEN}bc.create${NC} <fqdn> <ip>                        Create A record (auto PTR)"
+  echo -e "  ${GREEN}bc.create${NC} [A|CNAME|TXT] ...                  Create DNS record (A default)"
   echo -e "  ${GREEN}bc.create_cname${NC} <fqdn> <target>              Create CNAME record"
   echo -e "  ${GREEN}bc.create_txt${NC} <name> <domain> <value>        Create TXT record"
   echo -e "  ${GREEN}bc.delete${NC} <fqdn> [type]                      Delete DNS record"
@@ -128,6 +128,8 @@ function bc.help() {
   echo
   echo -e "${YELLOW}Examples:${NC}"
   echo "  bc.create webserver.example.com 172.25.50.100"
+  echo "  bc.create CNAME www.example.com webserver"
+  echo "  bc.create TXT @ example.com \"v=spf1 -all\""
   echo "  bc.create_cname www.example.com webserver"
   echo "  bc.create_txt @ example.com \"v=spf1 -all\""
   echo "  bc.list example.com"
@@ -143,38 +145,68 @@ function bc.help() {
   echo "  BC_MANAGER: $BC_MANAGER"
 }
 
-# Create A record (and PTR)
+# Create DNS record (A default; supports CNAME/TXT type dispatch)
 function bc.create() {
-  local USAGE="Usage: $FUNCNAME <fqdn> <ip>
-       $FUNCNAME <hostname> <domain> <ip>
-Create an A record and automatic PTR record.
+  local USAGE="Usage: $FUNCNAME [A] <fqdn> <ip>
+       $FUNCNAME [A] <hostname> <domain> <ip>
+       $FUNCNAME CNAME <fqdn> <target>
+       $FUNCNAME CNAME <alias> <domain> <target>
+       $FUNCNAME TXT <name> <domain> <value>
+Create DNS records from one entry point.
 
 Examples:
   $FUNCNAME webserver.example.com 172.25.50.100
-  $FUNCNAME webserver example.com 172.25.50.100"
-  
-  if [[ -z $2 ]] || [[ $1 == "-?" ]]; then
+  $FUNCNAME CNAME www.example.com webserver
+  $FUNCNAME TXT @ example.com \"v=spf1 -all\""
+
+  if [[ -z ${1:-} ]] || [[ $1 == "-?" ]] || [[ $1 == "--help" ]]; then
     echo "$USAGE"
-    return 1
+    return 0
   fi
-  
-  _bc_check_connection || return 1
-  
-  # Support both FQDN and hostname+domain formats
-  if [[ -z $3 ]]; then
-    # FQDN format: <fqdn> <ip>
-    local fqdn="$1"
-    local ip="$2"
-    echo "Creating A record: ${fqdn} -> ${ip}"
-    _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.create_record \"$fqdn\" \"$ip\"'"
-  else
-    # Traditional format: <hostname> <domain> <ip>
-    local hostname="$1"
-    local domain="$2"
-    local ip="$3"
-    echo "Creating A record: ${hostname}.${domain} -> ${ip}"
-    _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.create_record \"$hostname\" \"$domain\" \"$ip\"'"
-  fi
+
+  local record_type="A"
+  case "${1^^}" in
+    A|CNAME|TXT)
+      record_type="${1^^}"
+      shift
+      ;;
+  esac
+
+  case "$record_type" in
+    A)
+      if [[ -z ${2:-} ]]; then
+        echo "$USAGE"
+        return 1
+      fi
+      _bc_check_connection || return 1
+
+      # Support both FQDN and hostname+domain formats
+      if [[ -z ${3:-} ]]; then
+        # FQDN format: <fqdn> <ip>
+        local fqdn="$1"
+        local ip="$2"
+        echo "Creating A record: ${fqdn} -> ${ip}"
+        _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.create_record \"$fqdn\" \"$ip\"'"
+      else
+        # Traditional format: <hostname> <domain> <ip>
+        local hostname="$1"
+        local domain="$2"
+        local ip="$3"
+        echo "Creating A record: ${hostname}.${domain} -> ${ip}"
+        _bc_ssh "sudo bash -c 'export BIND_NONINTERACTIVE=1 && source $BC_MANAGER && bc.create_record \"$hostname\" \"$domain\" \"$ip\"'"
+      fi
+      ;;
+    CNAME)
+      bc.create_cname "$@"
+      ;;
+    TXT)
+      bc.create_txt "$@"
+      ;;
+    *)
+      echo "✗ Unsupported record type: $record_type (supported: A, CNAME, TXT)"
+      return 1
+      ;;
+  esac
 }
 
 # Create CNAME record

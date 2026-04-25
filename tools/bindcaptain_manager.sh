@@ -1218,7 +1218,7 @@ bc.help() {
     __print_manager_header
     echo -e "${WHITE}Available Commands (same API on host and via Chief plugin):${NC}"
     echo
-    echo -e "  ${GREEN}bc.create${NC} / ${GREEN}bc.create_record${NC}  - Create DNS A record (auto PTR)"
+    echo -e "  ${GREEN}bc.create${NC} / ${GREEN}bc.create_record${NC}  - Create DNS record (A default)"
     echo -e "  ${GREEN}bc.create_cname${NC}   - Create CNAME record"
     echo -e "  ${GREEN}bc.create_txt${NC}     - Create TXT record"
     echo -e "  ${GREEN}bc.delete${NC} / ${GREEN}bc.delete_record${NC}  - Delete DNS record"
@@ -1234,12 +1234,14 @@ bc.help() {
     echo -e "  Aliases: ${CYAN}bc.a${NC}=bc.create ${CYAN}bc.ls${NC}=bc.list ${CYAN}bc.rm${NC}=bc.delete ${CYAN}bc.cname${NC}=bc.create_cname ${CYAN}bc.txt${NC}=bc.create_txt"
     echo
     echo -e "${YELLOW}Usage:${NC}"
-    echo "  bc.create <fqdn> <ip>   or   bc.create_record --help"
+    echo "  bc.create [A|CNAME|TXT] ...   or   bc.create_record --help"
     echo "  bc.refresh              (or: $0 refresh when run as script)"
     echo
     echo -e "${YELLOW}Example:${NC}"
     if [ ${#DOMAINS[@]} -gt 0 ]; then
-        echo "  bc.create webserver.${DOMAINS[0]} 172.25.50.100   # or bc.create_record webserver ${DOMAINS[0]} 172.25.50.100"
+        echo "  bc.create webserver.${DOMAINS[0]} 172.25.50.100"
+        echo "  bc.create CNAME www.${DOMAINS[0]} webserver"
+        echo "  bc.create TXT @ ${DOMAINS[0]} 'v=spf1 -all'"
     else
         echo "  bc.create webserver.example.com 172.25.50.100"
     fi
@@ -1256,7 +1258,38 @@ bc.show_environment() {
 
 # Short names (same as Chief plugin) so host and remote have identical bc.* API
 bc.create() {
-    bc.create_record "$@"
+    local record_type="A"
+    if [[ "${1:-}" == "-?" ]] || [[ "${1:-}" == "--help" ]]; then
+        echo -e "${WHITE}bc.create${NC} - Unified create command"
+        echo
+        echo -e "${YELLOW}Usage:${NC}"
+        echo "  bc.create [A] <fqdn> <ip>"
+        echo "  bc.create [A] <hostname> <domain> <ip>"
+        echo "  bc.create CNAME <fqdn> <target>"
+        echo "  bc.create CNAME <alias> <domain> <target>"
+        echo "  bc.create TXT <name> <domain> <value>"
+        echo
+        echo "Record type defaults to A when omitted."
+        echo "Supported types: A, CNAME, TXT"
+        return 0
+    fi
+
+    case "${1^^}" in
+        A|CNAME|TXT)
+            record_type="${1^^}"
+            shift
+            ;;
+    esac
+
+    case "$record_type" in
+        A) bc.create_record "$@" ;;
+        CNAME) bc.create_cname "$@" ;;
+        TXT) bc.create_txt "$@" ;;
+        *)
+            print_status "error" "Unsupported record type: $record_type (supported: A, CNAME, TXT)"
+            return 1
+            ;;
+    esac
 }
 bc.list() {
     bc.list_records "$@"
