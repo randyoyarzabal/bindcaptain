@@ -313,7 +313,7 @@ __increment_serial() {
 # nothing was reloaded (or when the container restart fallback still failed).
 __reload_bind_required() {
     if ! __reload_bind; then
-        print_status "error" "Zone files were updated on disk, but BIND reload failed. The running service may be stale, stopped, or the container in a bad state. Check: podman ps -a --filter name=$CONTAINER_NAME, podman logs $CONTAINER_NAME, and /usr/sbin/rndc status inside the container."
+        print_status "error" "Zone files were updated on disk, but BIND reload failed. No automatic container restart was performed. Check: podman ps -a --filter name=$CONTAINER_NAME, podman logs $CONTAINER_NAME, and /usr/sbin/rndc status inside the container. If needed, restart manually: podman restart $CONTAINER_NAME"
         return 1
     fi
     return 0
@@ -339,16 +339,11 @@ __reload_bind() {
                 __log_action "BIND reloaded via container"
                 return 0
             else
-                print_status "warning" "rndc reload failed, attempting container restart..."
-                if podman restart "$CONTAINER_NAME" >/dev/null 2>&1; then
-                    sleep 3  # Give container time to start
-                    print_status "success" "BIND reloaded via container restart"
-                    __log_action "BIND reloaded via container restart"
-                    return 0
-                else
-                    print_status "error" "Failed to reload BIND via container"
-                    return 1
-                fi
+                # Avoid restarting the DNS container during CRUD operations; that can
+                # look like "BindCaptain died" from remote clients and interrupts service.
+                print_status "error" "rndc reload failed (container not restarted automatically)"
+                __log_action "ERROR: rndc reload failed for $CONTAINER_NAME (no auto-restart)"
+                return 1
             fi
         else
             print_status "error" "Cannot reload BIND - not in container and podman not available"
