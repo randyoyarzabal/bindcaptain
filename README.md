@@ -121,15 +121,18 @@ bc.create_record|bc.create_cname|bc.create_txt|bc.delete_record|bc.list_records
 
 > **Complete command reference?** See [Cheat Sheet](docs/cheat-sheet.md) for all available commands and examples.
 
-### Git: push to GitHub and Fluxmire Gitea
+### Git: GitHub + Fluxmire Gitea
 
-After cloning, run once so **`git push origin`** updates **both** [GitHub](https://github.com/randyoyarzabal/bindcaptain) and Fluxmire Gitea (`ssh://git@git.fluxmire.io:2222/homelab/bindcaptain.git`):
+Run once from the repo root so **`origin`** fetches from **GitHub**, **`gitea`** fetches from **Gitea**, and **`git push origin`** updates **both** remotes:
 
 ```bash
 ./tools/setup-git-dual-push.sh
 ```
 
-The named **`gitea`** remote is unchanged if you use **`git fetch gitea`** separately.
+- **`git fetch --all`** updates `remotes/origin/*` and `remotes/gitea/*` (same `main` once both are in sync).
+- **Deploy host** (e.g. DNS server) with SSH only for Gitea: run with  
+  `BINDCAPTAIN_PREFER_GITEA_FOR_PULL=1 ./tools/setup-git-dual-push.sh`  
+  so **`git pull`** fast-forwards from Gitea; add a [GitHub deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys#deploy-keys) (or `~/.ssh` for `git@github.com`) on that host so **`git fetch origin`** and GitHub half of **`git push origin`** succeed.
 
 ## Features
 
