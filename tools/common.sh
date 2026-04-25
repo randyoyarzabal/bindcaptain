@@ -176,16 +176,31 @@ exec_in_context() {
     fi
 }
 
+# Reload BIND in the podman container: try rndc first, then SIGHUP to the container’s
+# main process (named). HUP is safe: it reloads zones without stopping the container
+# (unlike podman restart). Use when rndc is misconfigured (e.g. no controls channel).
+__reload_bind_podman() {
+    if ! is_container_running; then
+        return 1
+    fi
+    if podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload 2>/dev/null; then
+        return 0
+    fi
+    if podman kill -s HUP "$CONTAINER_NAME" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 # Reload BIND configuration
 reload_bind() {
     if is_container_running; then
-        if podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload 2>/dev/null; then
+        if __reload_bind_podman; then
             print_status "success" "BIND reloaded successfully"
             return 0
-        else
-            print_status "error" "rndc reload failed (container not restarted automatically)"
-            return 1
         fi
+        print_status "error" "rndc reload and SIGHUP both failed (container not restarted)"
+        return 1
     else
         print_status "error" "Cannot reload BIND - container not running"
         return 1

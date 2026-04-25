@@ -313,7 +313,7 @@ __increment_serial() {
 # nothing was reloaded (or when the container restart fallback still failed).
 __reload_bind_required() {
     if ! __reload_bind; then
-        print_status "error" "Zone files were updated on disk, but BIND reload failed. No automatic container restart was performed. Check: podman ps -a --filter name=$CONTAINER_NAME, podman logs $CONTAINER_NAME, and /usr/sbin/rndc status inside the container. If needed, restart manually: podman restart $CONTAINER_NAME"
+        print_status "error" "Zone files were updated on disk, but BIND reload failed (rndc and SIGHUP). Check: podman ps, podman logs $CONTAINER_NAME. Manual recovery: podman kill -s HUP $CONTAINER_NAME, or as last resort: podman restart $CONTAINER_NAME"
         return 1
     fi
     return 0
@@ -327,24 +327,38 @@ __reload_bind() {
             print_status "success" "BIND reloaded successfully"
             __log_action "BIND reloaded"
             return 0
-        else
-            print_status "error" "Failed to reload BIND"
-            return 1
         fi
-    else
-        # Running on host - reload via container
-        if command -v podman &> /dev/null; then
-            if podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload 2>/dev/null; then
-                print_status "success" "BIND reloaded successfully (via container)"
-                __log_action "BIND reloaded via container"
+        if [ -f /run/named/named.pid ]; then
+            if kill -HUP "$(cat /run/named/named.pid)" 2>/dev/null; then
+                print_status "success" "BIND reloaded via SIGHUP (named pid)"
+                __log_action "BIND reloaded via SIGHUP (named)"
                 return 0
-            else
-                # Avoid restarting the DNS container during CRUD operations; that can
-                # look like "BindCaptain died" from remote clients and interrupts service.
-                print_status "error" "rndc reload failed (container not restarted automatically)"
-                __log_action "ERROR: rndc reload failed for $CONTAINER_NAME (no auto-restart)"
+            fi
+        fi
+        print_status "error" "Failed to reload BIND (rndc and SIGHUP)"
+        return 1
+    else
+        # Running on host - reload via container: rndc, else SIGHUP to container (named)
+        if command -v podman &> /dev/null; then
+            if ! is_container_running 2>/dev/null; then
+                print_status "error" "Cannot reload BIND - container not running"
                 return 1
             fi
+            if podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload 2>/dev/null; then
+                print_status "success" "BIND reloaded successfully (via container)"
+                __log_action "BIND reloaded via container (rndc)"
+                return 0
+            fi
+            print_status "info" "rndc reload failed; trying SIGHUP to named in container (no full restart)"
+            if podman kill -s HUP "$CONTAINER_NAME" 2>/dev/null; then
+                sleep 1
+                print_status "success" "BIND reloaded via SIGHUP (container main process)"
+                __log_action "BIND reloaded via container (SIGHUP)"
+                return 0
+            fi
+            print_status "error" "rndc reload and SIGHUP both failed for $CONTAINER_NAME"
+            __log_action "ERROR: rndc and SIGHUP reload failed for $CONTAINER_NAME"
+            return 1
         else
             print_status "error" "Cannot reload BIND - not in container and podman not available"
             return 1
