@@ -359,7 +359,7 @@ test_security() {
     test_pass "Security Best Practices"
 }
 
-# Live bc.* CRUD against real zones (reonetlabs.us, fluxmire.io, homelab.io).
+# Live bc.* CRUD against real configured zones (see test driver).
 # Requires BC_LIVE_TESTS=1. Set BC_HOST when running from a workstation (e.g. root@wolfman.reonetlabs.us).
 test_bc_live_crud() {
     if [[ "${BC_LIVE_TESTS:-}" != "1" ]]; then

@@ -975,7 +975,7 @@ bc.delete_record() {
     [ -n "$record_type" ] && echo "Type: $record_type"
     echo
     
-    # Validations (multi-label relative names allowed, e.g. mactest.lab under fluxmire.io)
+    # Validations (multi-label relative names allowed, e.g. mactest.lab under an apex domain)
     if ! validate_relative_dns_name "$name"; then
         print_status "error" "Invalid name: $name"
         return 1

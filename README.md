@@ -121,18 +121,17 @@ bc.create_record|bc.create_cname|bc.create_txt|bc.delete_record|bc.list_records
 
 > **Complete command reference?** See [Cheat Sheet](docs/cheat-sheet.md) for all available commands and examples.
 
-### Git: GitHub + Fluxmire Gitea
+### Git: GitHub + private mirror (optional)
 
-Run once from the repo root so **`origin`** fetches from **GitHub**, **`gitea`** fetches from **Gitea**, and **`git push origin`** updates **both** remotes:
+To push and fetch both **this GitHub repository** and a **separate, private Git remote** (self-hosted, team, etc.), do not store that mirror’s URL in the public tree. Choose one way to point at it, then run:
 
 ```bash
+export BINDCAPTAIN_GIT_MIRROR_URL='ssh://…'   # or: copy local/git-mirror.url.example → local/git-mirror.url
 ./tools/setup-git-dual-push.sh
 ```
 
-- **`git fetch --all`** updates `remotes/origin/*` and `remotes/gitea/*` (same `main` once both are in sync).
-- **Deploy host** (e.g. DNS server) with SSH only for Gitea: run with  
-  `BINDCAPTAIN_PREFER_GITEA_FOR_PULL=1 ./tools/setup-git-dual-push.sh`  
-  so **`git pull`** fast-forwards from Gitea; add a [GitHub deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys#deploy-keys) (or `~/.ssh` for `git@github.com`) on that host so **`git fetch origin`** and GitHub half of **`git push origin`** succeed.
+- **`local/git-mirror.url`** (gitignored) can hold a single `ssh://…` or `git@…` line (see **local/git-mirror.url.example**). If a second remote is already in your local `.git/config`, the script can reuse that URL.
+- **`git push origin`** goes to both GitHub and the mirror; **`git fetch --all`** updates both. On a **deploy host** that only has SSH to the private mirror, use **`BINDCAPTAIN_PREFER_MIRROR_FOR_PULL=1`** so **`git pull`** fast-forwards from the mirror; add a [GitHub deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys#deploy-keys) (or a key for `git@github.com`) so **`git fetch origin`** and the GitHub leg of **`git push origin`** work.
 
 ## Features
 

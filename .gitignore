@@ -1,8 +1,9 @@
-# --- Production zone files on wolfman live under /opt/bindcaptain/config/ (not this clone).
-# This repo ignores config/ so laptops don't commit live zones by mistake. You still need a
-# **Git backup** of authoritative zones: mirror wolfman → fluxmire (e.g. external/dns-bindcaptain/)
-# or a dedicated repo; see fluxmire docs/plans/fluxmire-infrastructure-plan.md Section 3
-# ("BindCaptain authoritative config: Git mirror").
+# --- Production zone files on a live host often live outside this clone (see docs).
+# This repo ignores config/ so laptops don't commit live zones by mistake.
+# Authoritative zone backups can live in a private mirror (not documented here in-tree).
+# Private second Git remote URL (self-hosted); never commit — see local/git-mirror.url.example
+local/git-mirror.url
+
 # Configuration backups
 backups/
 config.backup

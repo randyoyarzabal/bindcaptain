@@ -1,0 +1,3 @@
+# Copy this file to git-mirror.url and replace the line below with your private mirror (do not commit git-mirror.url).
+
+ssh://git@git.example.invalid/your-org/bindcaptain.git
