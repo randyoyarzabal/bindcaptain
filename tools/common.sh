@@ -183,14 +183,8 @@ reload_bind() {
             print_status "success" "BIND reloaded successfully"
             return 0
         else
-            print_status "warning" "rndc reload failed, attempting container restart..."
-            if podman restart "$CONTAINER_NAME" >/dev/null 2>&1; then
-                print_status "success" "BIND reloaded via container restart"
-                return 0
-            else
-                print_status "error" "Failed to reload BIND via container"
-                return 1
-            fi
+            print_status "error" "rndc reload failed (container not restarted automatically)"
+            return 1
         fi
     else
         print_status "error" "Cannot reload BIND - container not running"
