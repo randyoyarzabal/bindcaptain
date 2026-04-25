@@ -311,18 +311,36 @@ __increment_serial() {
 
 # Reload BIND after zone changes; require success so callers do not report "created" when
 # nothing was reloaded (or when the container restart fallback still failed).
+# Optional args: zone apex name(s) e.g. fluxmire.io 50.25.172.in-addr.arpa — uses per-zone
+# rndc reload so the running server picks up file changes immediately (avoids stale answers).
 __reload_bind_required() {
-    if ! __reload_bind; then
+    if ! __reload_bind "$@"; then
         print_status "error" "Zone files were updated on disk, but BIND reload failed (rndc and SIGHUP). Check: podman ps, podman logs $CONTAINER_NAME. Manual recovery: podman kill -s HUP $CONTAINER_NAME, or as last resort: podman restart $CONTAINER_NAME"
         return 1
     fi
     return 0
 }
 
-# Reload BIND (container-aware)
+# Reload BIND (container-aware). With zone name(s), runs rndc reload <zone> for each
+# (instant authoritative update from disk). With no args, full rndc reload, then SIGHUP fallback.
 __reload_bind() {
     if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
         # Running inside container
+        if [ $# -gt 0 ]; then
+            local _z _per_ok=1
+            for _z in "$@"; do
+                if ! /usr/sbin/rndc reload "$_z" 2>/dev/null; then
+                    _per_ok=0
+                    print_status "info" "rndc reload '$_z' failed; will try full reload"
+                    break
+                fi
+            done
+            if [ "$_per_ok" -eq 1 ]; then
+                print_status "success" "BIND zones reloaded: $*"
+                __log_action "BIND reloaded (rndc): $*"
+                return 0
+            fi
+        fi
         if systemctl reload named 2>/dev/null || /usr/sbin/rndc reload 2>/dev/null; then
             print_status "success" "BIND reloaded successfully"
             __log_action "BIND reloaded"
@@ -344,9 +362,24 @@ __reload_bind() {
                 print_status "error" "Cannot reload BIND - container not running"
                 return 1
             fi
+            if [ $# -gt 0 ]; then
+                local _z _per_ok=1
+                for _z in "$@"; do
+                    if ! podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload "$_z" 2>/dev/null; then
+                        _per_ok=0
+                        print_status "info" "rndc reload '$_z' failed; trying full server reload"
+                        break
+                    fi
+                done
+                if [ "$_per_ok" -eq 1 ]; then
+                    print_status "success" "BIND zones reloaded (via container: $*)"
+                    __log_action "BIND reloaded via container (rndc): $*"
+                    return 0
+                fi
+            fi
             if podman exec "$CONTAINER_NAME" /usr/sbin/rndc reload 2>/dev/null; then
-                print_status "success" "BIND reloaded successfully (via container)"
-                __log_action "BIND reloaded via container (rndc)"
+                print_status "success" "BIND reloaded successfully (via container, full)"
+                __log_action "BIND reloaded via container (rndc full)"
                 return 0
             fi
             print_status "info" "rndc reload failed; trying SIGHUP to named in container (no full restart)"
@@ -406,6 +439,26 @@ __validate_zone() {
             return 0
         fi
     fi
+}
+
+# Echo reverse zone apex (e.g. 50.25.172.in-addr.arpa) for an IP, or nothing.
+# Uses the same network map as __create_ptr_record.
+__get_reverse_zone_apex_for_ip() {
+    local ip_address=$1
+    local networks=(
+        "172.25.40:40.25.172.in-addr.arpa:reonetlabs.us"
+        "172.25.42:42.25.172.in-addr.arpa:reonetlabs.us"
+        "172.25.50:50.25.172.in-addr.arpa:reonetlabs.us"
+    )
+    for network in "${networks[@]}"; do
+        local subnet; subnet=$(echo "$network" | cut -d: -f1)
+        local reverse_zone; reverse_zone=$(echo "$network" | cut -d: -f2)
+        if [[ "$ip_address" == ${subnet}.* ]]; then
+            echo "$reverse_zone"
+            return 0
+        fi
+    done
+    return 1
 }
 
 # Create PTR record for given IP and hostname
@@ -607,8 +660,13 @@ bc.create_record() {
         # Create corresponding PTR record before reload
         __create_ptr_record "$ip_address" "$hostname" "$domain"
         
-        # Reload BIND to pick up both forward and reverse zone changes
-        if ! __reload_bind_required; then
+        # Per-zone rndc reload so this server answers updated data immediately
+        local _rzones=("$domain")
+        _rzx=$(__get_reverse_zone_apex_for_ip "$ip_address" 2>/dev/null) || true
+        if [ -n "${_rzx:-}" ]; then
+            _rzones+=("$_rzx")
+        fi
+        if ! __reload_bind_required "${_rzones[@]}"; then
             return 1
         fi
         
@@ -761,7 +819,7 @@ bc.create_cname() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        if ! __reload_bind_required; then
+        if ! __reload_bind_required "$domain"; then
             return 1
         fi
         print_status "success" "CNAME record created: $alias.$domain -> $target"
@@ -866,7 +924,7 @@ bc.create_txt() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        if ! __reload_bind_required; then
+        if ! __reload_bind_required "$domain"; then
             return 1
         fi
         print_status "success" "TXT record created: $name.$domain -> \"$text_value\""
@@ -1023,7 +1081,7 @@ bc.delete_record() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        if ! __reload_bind_required; then
+        if ! __reload_bind_required "$domain"; then
             return 1
         fi
         print_status "success" "Record(s) deleted: $target_fqdn"

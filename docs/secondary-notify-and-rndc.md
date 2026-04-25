@@ -20,6 +20,11 @@ Authoritative secondaries (including Synology DNS Server) need:
    - `config-examples/named-fragment-rndc.conf`
    - `tools/ensure-rndc-controls.sh` (and rebuild the image so `/etc/rndc.key` is `root:named` + `640`, or run the script to fix a running container).
 
+## “Instant” updates vs TTL
+
+- **This nameserver (172.25.50.156):** After `bc` changes a zone file, BindCaptain runs **`rndc reload <zone>`** for the affected zone(s) so in-memory data matches the file **immediately** on that host.
+- **Other clients / 8.8.8.8 / your laptop’s “default” DNS:** Those still follow **TTL** from the last cached answer. That can be **hours** (e.g. 86400). For a true end-to-end check, query the authoritative address: `dig @172.25.50.156 name.example.com A`.
+
 ## One-time: enable rndc (recommended)
 
 1. `sudo MERGE_NAMED=1 BINDCAPTAIN_CONFIG_PATH=/path/to/your/config ./tools/ensure-rndc-controls.sh`
