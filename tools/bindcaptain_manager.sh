@@ -19,6 +19,7 @@
 #   bc.delete_record    - Delete DNS record
 #   bc.list_records     - List DNS records
 #   bc.refresh           - Refresh and validate DNS configuration
+#   bc.sync_ptr_from_forwards - Rebuild PTR zones from forward A records
 #   bc.show_environment  - Show environment information
 #   bc.help              - Show help
 #
@@ -40,7 +41,7 @@
 #
 # FEATURES:
 #   - Container-aware (works inside and outside containers)
-#   - Automatic PTR record creation for A records
+#   - PTR records for lab subnets derived from forward A records (sync on refresh/delete/create)
 #   - Zone file validation and backup
 #   - Interactive record management
 #   - BIND reload and validation
@@ -377,39 +378,35 @@ __reload_bind() {
     fi
 }
 
-# Validate zone file
-__validate_zone() {
-    local domain=$1
-    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+# Validate zone file at an explicit path (zone apex name + file path).
+__validate_zone_at_path() {
+    local zone_name=$1
+    local zone_file=$2
+
     if [ ! -f "$zone_file" ]; then
-        zone_file="$BIND_DIR/${domain}.db"
+        print_status "error" "Zone file not found: $zone_file"
+        return 1
     fi
-    
+
     if [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ]; then
-        # Running inside container
-        if named-checkzone "$domain" "$zone_file" >/dev/null 2>&1; then
-            print_status "success" "Zone $domain validation passed"
+        if named-checkzone "$zone_name" "$zone_file" >/dev/null 2>&1; then
+            print_status "success" "Zone $zone_name validation passed"
             return 0
         else
-            print_status "error" "Zone $domain validation failed"
-            named-checkzone "$domain" "$zone_file"
+            print_status "error" "Zone $zone_name validation failed"
+            named-checkzone "$zone_name" "$zone_file"
             return 1
         fi
     else
-        # Running on host - validate via container
         if command -v podman &> /dev/null; then
-            # Try subdirectory structure first, then fallback to direct path
-            local container_zone_file="/var/named/${domain}/${domain}.db"
-            if ! podman exec "$CONTAINER_NAME" test -f "$container_zone_file" 2>/dev/null; then
-                container_zone_file="/var/named/${domain}.db"
-            fi
-            
-            if podman exec "$CONTAINER_NAME" named-checkzone "$domain" "$container_zone_file" >/dev/null 2>&1; then
-                print_status "success" "Zone $domain validation passed (via container)"
+            local container_zone_file
+            container_zone_file=$(echo "$zone_file" | sed "s|$BIND_DIR|/var/named|")
+            if podman exec "$CONTAINER_NAME" named-checkzone "$zone_name" "$container_zone_file" >/dev/null 2>&1; then
+                print_status "success" "Zone $zone_name validation passed (via container)"
                 return 0
             else
-                print_status "error" "Zone $domain validation failed (via container)"
-                podman exec "$CONTAINER_NAME" named-checkzone "$domain" "$container_zone_file"
+                print_status "error" "Zone $zone_name validation failed (via container)"
+                podman exec "$CONTAINER_NAME" named-checkzone "$zone_name" "$container_zone_file"
                 return 1
             fi
         else
@@ -419,56 +416,173 @@ __validate_zone() {
     fi
 }
 
-# Create PTR record for given IP and hostname
-__create_ptr_record() {
-    local ip_address=$1
-    local hostname=$2
-    local domain=$3
-    
-    # Define networks and their reverse zones
-    local networks=(
-        "172.25.40:40.25.172.in-addr.arpa:reonetlabs.us"
-        "172.25.42:42.25.172.in-addr.arpa:reonetlabs.us" 
-        "172.25.50:50.25.172.in-addr.arpa:reonetlabs.us"
-    )
-    
-    # Determine which reverse zone this IP belongs to
-    for network in "${networks[@]}"; do
-        local subnet=$(echo "$network" | cut -d: -f1)
-        local reverse_zone=$(echo "$network" | cut -d: -f2)
-        local reverse_domain=$(echo "$network" | cut -d: -f3)
-        
-        if [[ "$ip_address" == ${subnet}.* ]]; then
-            local last_octet=$(echo "$ip_address" | cut -d. -f4)
-            local ptr_record="${last_octet}			IN	PTR	${hostname}.${domain}."
-            local reverse_file="$BIND_DIR/${reverse_domain}/${reverse_zone}.db"
-            
-            if [ -f "$reverse_file" ]; then
-                # Check if PTR record already exists for this IP
-                if grep -q "^${last_octet}.*PTR" "$reverse_file"; then
-                    # Remove existing PTR record for this IP
-                    sed -i "/^${last_octet}.*PTR/d" "$reverse_file"
-                    print_status "info" "Removed existing PTR record for $ip_address"
-                fi
-                
-                # Add new PTR record
-                echo "$ptr_record" >> "$reverse_file"
-                
-                # Increment serial number in reverse zone
-                __increment_serial "$reverse_file"
-                
-                print_status "success" "PTR record created: $ip_address -> ${hostname}.${domain}"
-                __log_action "Created PTR record: $ip_address -> ${hostname}.${domain}"
-                return 0
-            else
-                print_status "warning" "Reverse zone file not found: $reverse_file"
-                return 1
-            fi
+# Validate zone file (forward zones: apex = domain name).
+__validate_zone() {
+    local domain=$1
+    local zone_file="$BIND_DIR/${domain}/${domain}.db"
+    if [ ! -f "$zone_file" ]; then
+        zone_file="$BIND_DIR/${domain}.db"
+    fi
+    __validate_zone_at_path "$domain" "$zone_file"
+}
+
+# Lab subnets whose reverse zones BindCaptain rewrites from forward A records (last field = zone dir under BIND_DIR).
+__ptr_managed_network_lines() {
+    echo "172.25.40:40.25.172.in-addr.arpa:reonetlabs.us"
+    echo "172.25.42:42.25.172.in-addr.arpa:reonetlabs.us"
+    echo "172.25.50:50.25.172.in-addr.arpa:reonetlabs.us"
+}
+
+# Emit IPv4 A records as ip<TAB>fqdn (last duplicate IP wins), one per discovered forward zone.
+__emit_forward_a_map() {
+    local d zone_file current_origin line name type value fqdn in_multiline
+    for d in "${DOMAINS[@]}"; do
+        zone_file="$BIND_DIR/${d}/${d}.db"
+        if [ ! -f "$zone_file" ]; then
+            zone_file="$BIND_DIR/${d}.db"
         fi
+        if [ ! -f "$zone_file" ]; then
+            continue
+        fi
+        current_origin="${d}."
+        in_multiline=false
+        while IFS= read -r line || [ -n "$line" ]; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ "$line" =~ ^[[:space:]]*\; ]] && continue
+            [[ -z "${line// }" ]] && continue
+            if [[ "$in_multiline" == true ]]; then
+                [[ "$line" =~ \) ]] && in_multiline=false
+                continue
+            fi
+            if [[ "$line" =~ ^\$ORIGIN[[:space:]]+(.+) ]]; then
+                current_origin="${BASH_REMATCH[1]}"
+                [[ ! "$current_origin" =~ \.$ ]] && current_origin="${current_origin}."
+                continue
+            fi
+            line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+IN[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+                name="${BASH_REMATCH[1]}"
+                type="${BASH_REMATCH[2]}"
+                value="${BASH_REMATCH[3]}"
+            elif [[ "$line" =~ ^([^[:space:]]+)[[:space:]]+([A-Z]+)[[:space:]]+(.+)$ ]]; then
+                name="${BASH_REMATCH[1]}"
+                type="${BASH_REMATCH[2]}"
+                value="${BASH_REMATCH[3]}"
+            else
+                continue
+            fi
+            if [ "$type" == "SOA" ]; then
+                [[ "$value" =~ \( ]] && in_multiline=true
+                continue
+            fi
+            if [ "$type" == "NS" ] && { [ "$name" == "@" ] || [ "$name" == "$d" ]; }; then
+                continue
+            fi
+            if [ "$type" != "A" ]; then
+                continue
+            fi
+            value="${value%%;*}"
+            value=$(echo "$value" | sed 's/[[:space:]]*$//')
+            [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue
+            if [[ "$name" == "@" ]]; then
+                fqdn="$d"
+            elif [[ "$name" =~ \.$ ]]; then
+                fqdn="${name%.}"
+            elif [[ "$current_origin" == "$d." ]]; then
+                fqdn="${name}.${d}"
+            else
+                fqdn="${name}.${current_origin%.}"
+            fi
+            fqdn=$(__dns_normalize "$fqdn")
+            printf '%s\t%s\n' "$value" "$fqdn"
+        done <"$zone_file"
     done
-    
-    print_status "warning" "No matching reverse zone found for IP: $ip_address"
-    return 1
+}
+
+# Rewrite managed reverse zones so PTR RRs match forward A records (orphan PTR lines removed).
+# Optional: --no-reload — skip rndc reload (caller reloads once).
+__sync_ptr_zones_from_forwards() {
+    local no_reload=false
+    if [[ "${1:-}" == "--no-reload" ]]; then
+        no_reload=true
+    fi
+
+    if [ ${#DOMAINS[@]} -eq 0 ]; then
+        print_status "warning" "No domains discovered; PTR sync skipped"
+        return 0
+    fi
+
+    local map_file
+    map_file=$(mktemp) || return 1
+    __emit_forward_a_map | awk -F'\t' '{map[$1]=$2} END {for (ip in map) print ip "\t" map[ip]}' >"$map_file"
+
+    local any_changed=false
+    local network subnet reverse_zone reverse_domain reverse_file tmp_new ptr_block bak
+    while IFS= read -r network; do
+        [ -z "$network" ] && continue
+        subnet=$(echo "$network" | cut -d: -f1)
+        reverse_zone=$(echo "$network" | cut -d: -f2)
+        reverse_domain=$(echo "$network" | cut -d: -f3)
+        reverse_file="$BIND_DIR/${reverse_domain}/${reverse_zone}.db"
+        if [ ! -f "$reverse_file" ]; then
+            continue
+        fi
+
+        tmp_new=$(mktemp) || {
+            rm -f "$map_file"
+            return 1
+        }
+        awk '$0 ~ /^[[:space:]]*[0-9]{1,3}[[:space:]]+IN[[:space:]]+PTR[[:space:]]/ {next} {print}' "$reverse_file" >"$tmp_new"
+
+        ptr_block=$(mktemp) || {
+            rm -f "$tmp_new" "$map_file"
+            return 1
+        }
+        awk -F'\t' -v pref="$subnet." '$1 ~ "^" pref {
+            split($1, a, ".")
+            oct = a[4]
+            fqdn = $2
+            if (fqdn !~ /\.$/) fqdn = fqdn "."
+            printf "%s\t\tIN\tPTR\t%s\n", oct, fqdn
+        }' "$map_file" | sort -n >"$ptr_block"
+
+        if [ -s "$ptr_block" ]; then
+            echo "" >>"$tmp_new"
+            cat "$ptr_block" >>"$tmp_new"
+        fi
+        rm -f "$ptr_block"
+
+        if cmp -s "$reverse_file" "$tmp_new"; then
+            rm -f "$tmp_new"
+            continue
+        fi
+
+        bak="${reverse_file}.bak.ptr_sync.$$"
+        cp "$reverse_file" "$bak"
+        if ! mv "$tmp_new" "$reverse_file"; then
+            rm -f "$bak"
+            rm -f "$map_file"
+            return 1
+        fi
+        __increment_serial "$reverse_file"
+        if ! __validate_zone_at_path "$reverse_zone" "$reverse_file"; then
+            mv "$bak" "$reverse_file"
+            rm -f "$map_file"
+            print_status "error" "PTR sync rolled back for $reverse_zone (zone invalid)"
+            return 1
+        fi
+        rm -f "$bak"
+        any_changed=true
+        print_status "success" "PTR zone synced from forward A records: $reverse_zone"
+        __log_action "PTR sync rewrote $reverse_file from forward A records"
+    done < <(__ptr_managed_network_lines)
+
+    rm -f "$map_file"
+
+    if [ "$any_changed" = true ] && [ "$no_reload" = false ]; then
+        __reload_bind_required || return 1
+    fi
+    return 0
 }
 
 # Function: bc.create_record
@@ -615,9 +729,10 @@ bc.create_record() {
     __increment_serial "$zone_file"
     
     if __validate_zone "$domain"; then
-        # Create corresponding PTR record before reload
-        __create_ptr_record "$ip_address" "$hostname" "$domain"
-        
+        if ! __sync_ptr_zones_from_forwards --no-reload; then
+            print_status "error" "PTR sync failed after create (fix zones and run: bc.sync_ptr_from_forwards)"
+            return 1
+        fi
         if ! __reload_bind_required; then
             return 1
         fi
@@ -1027,11 +1142,22 @@ bc.delete_record() {
     
     # Apply zone without matched lines
     mv "$keep_tmp" "$zone_file"
+    local did_delete_a=false
+    if grep -qE '[[:space:]]IN[[:space:]]+A[[:space:]]+' "$match_tmp" 2>/dev/null; then
+        did_delete_a=true
+    fi
     rm -f "$match_tmp"
-    
+
     # Increment serial and validate
     __increment_serial "$zone_file"
-    
+
+    if [ "$did_delete_a" = true ]; then
+        __sync_ptr_zones_from_forwards --no-reload || {
+            print_status "error" "PTR sync failed after delete (fix zones and run: bc.sync_ptr_from_forwards)"
+            return 1
+        }
+    fi
+
     if __validate_zone "$domain"; then
         if ! __reload_bind_required; then
             return 1
@@ -1243,6 +1369,7 @@ bc.help() {
     echo -e "  ${GREEN}bc.delete${NC} / ${GREEN}bc.delete_record${NC}  - Delete DNS record"
     echo -e "  ${GREEN}bc.list${NC} / ${GREEN}bc.list_records${NC}   - List records (all or by domain)"
     echo -e "  ${GREEN}bc.refresh${NC}         - Validate zones and reload BIND"
+    echo -e "  ${GREEN}bc.sync_ptr_from_forwards${NC} - Rebuild lab PTR zones from forward A records"
     echo -e "  ${GREEN}bc.git_refresh${NC}     - Update ⚓BindCaptain from Git"
     echo -e "  ${GREEN}bc.status${NC}          - Show service and container status"
     echo -e "  ${GREEN}bc.start${NC} / ${GREEN}bc.stop${NC} / ${GREEN}bc.restart${NC} - Service control"
@@ -1268,6 +1395,10 @@ bc.help() {
 }
 
 # Wrappers so all entry points use the bc. prefix (bc.refresh goes through __main for check_root)
+bc.sync_ptr_from_forwards() {
+    __main "$@"
+}
+
 bc.refresh() {
     __main "$@"
 }
@@ -1401,6 +1532,12 @@ __main() {
         bc.refresh)
             __refresh_dns "$@"
             ;;
+        bc.sync_ptr_from_forwards)
+            __print_manager_header
+            echo -e "${WHITE}PTR sync (from forward A records)${NC}"
+            echo
+            __sync_ptr_zones_from_forwards
+            ;;
             show_environment)
                 __show_environment "$@"
                 ;;
@@ -1444,7 +1581,14 @@ __refresh_dns() {
             chmod 644 "$NAMED_CONF" 2>/dev/null || true
         fi
     fi
-    
+
+    __log_action "Syncing PTR reverse zones from forward A records"
+    if ! __sync_ptr_zones_from_forwards --no-reload; then
+        __log_action "ERROR: PTR sync during refresh failed"
+        print_status "error" "PTR sync failed — fix zones or run bc.sync_ptr_from_forwards"
+        return 1
+    fi
+
     # Check configuration and zones, then full rndc reload so in-memory data matches disk and
     # NOTIFY is sent to secondaries (same path as after bc.create_record / bc.delete_record).
     if validate_bind_config && __check_zones; then
@@ -1507,7 +1651,39 @@ __check_zones() {
             fi
         fi
     done
-    
+
+    local ptr_net rz rd zf_ptr
+    while IFS= read -r ptr_net; do
+        [ -z "$ptr_net" ] && continue
+        rz=$(echo "$ptr_net" | cut -d: -f2)
+        rd=$(echo "$ptr_net" | cut -d: -f3)
+        zf_ptr="$BIND_DIR/${rd}/${rz}.db"
+        if [ ! -f "$zf_ptr" ]; then
+            continue
+        fi
+        if is_container; then
+            if named-checkzone "$rz" "$zf_ptr" >/dev/null 2>&1; then
+                __log_action "Zone $rz is valid"
+            else
+                __log_action "ERROR: Zone $rz has errors"
+                ((errors++)) || true
+            fi
+        else
+            if is_container_running; then
+                local container_zf_ptr
+                container_zf_ptr=$(echo "$zf_ptr" | sed "s|$BIND_DIR|/var/named|")
+                if podman exec "$CONTAINER_NAME" named-checkzone "$rz" "$container_zf_ptr" >/dev/null 2>&1; then
+                    __log_action "Zone $rz is valid"
+                else
+                    __log_action "ERROR: Zone $rz has errors"
+                    ((errors++)) || true
+                fi
+            else
+                __log_action "Cannot validate zone $rz - container not running"
+            fi
+        fi
+    done < <(__ptr_managed_network_lines)
+
     return $errors
 }
 

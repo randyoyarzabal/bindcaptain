@@ -44,7 +44,8 @@
 # COMMANDS (see bc.help after loading)
 #   bc.create, bc.create_cname, bc.create_txt  - Create DNS records
 #   bc.delete, bc.list                         - Delete / list records
-#   bc.refresh, bc.git_refresh                 - Refresh config / update from Git
+#   bc.refresh, bc.sync_ptr_from_forwards      - Refresh config / PTR rebuild from A records
+#   bc.git_refresh                             - Update from Git
 #   bc.status, bc.start, bc.stop, bc.restart  - Service control
 #   bc.ssh, bc.help                            - SSH to host / show help
 #
@@ -118,6 +119,7 @@ function bc.help() {
   echo -e "  ${GREEN}bc.delete${NC} <fqdn> [type]                      Delete DNS record"
   echo -e "  ${GREEN}bc.list${NC} [domain]                             List records (all or specific)"
   echo -e "  ${GREEN}bc.refresh${NC}                                   Refresh DNS config"
+  echo -e "  ${GREEN}bc.sync_ptr_from_forwards${NC}                  Rebuild PTR zones from forward A records"
   echo -e "  ${GREEN}bc.git_refresh${NC}                               Update ⚓BindCaptain from Git"
   echo -e "  ${GREEN}bc.status${NC}                                    Show service status"
   echo -e "  ${GREEN}bc.start${NC} / ${GREEN}bc.stop${NC} / ${GREEN}bc.restart${NC}                  Service control"
@@ -135,6 +137,7 @@ function bc.help() {
   echo "  bc.list example.com"
   echo "  bc.delete webserver.example.com"
   echo "  bc.refresh"
+  echo "  bc.sync_ptr_from_forwards"
   echo
   echo -e "${YELLOW}Configuration (current):${NC}"
   if [[ -n "$BC_HOST" ]]; then
@@ -355,6 +358,24 @@ This will:
   
   echo "Refreshing ⚓BindCaptain DNS configuration..."
   _bc_ssh "sudo $BC_MANAGER refresh"
+}
+
+# Rebuild lab PTR reverse zones from authoritative forward A records
+function bc.sync_ptr_from_forwards() {
+  local USAGE="Usage: $FUNCNAME
+Rewrite managed reverse zones (172.25.40/42/50) so PTRs match forward A records.
+
+Use after imports or manual zone edits; bc.refresh runs this automatically."
+
+  if [[ $1 == "-?" ]] || [[ $1 == "--help" ]]; then
+    echo "$USAGE"
+    return 0
+  fi
+
+  _bc_check_connection || return 1
+
+  echo "Syncing PTR zones from forward A records..."
+  _bc_ssh "sudo bash -c 'source $BC_MANAGER && bc.sync_ptr_from_forwards'"
 }
 
 # Update ⚓BindCaptain from GitHub
