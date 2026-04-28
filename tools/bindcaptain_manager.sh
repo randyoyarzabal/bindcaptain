@@ -317,6 +317,21 @@ __sync_bind_mount_writes() {
     fi
 }
 
+# Zone edits run as root; BIND reads zones as named (UID 25). Without this, rndc reload may
+# leave stale in-memory data because named cannot open updated master files (errno=EACCES).
+__chown_zone_files_for_named() {
+    if [ ! -d "$BIND_DIR" ]; then
+        return 0
+    fi
+    if is_container; then
+        find "$BIND_DIR" -name '*.db' -exec chown named:named {} + 2>/dev/null || true
+        find "$BIND_DIR" -name '*.db' -exec chmod 644 {} + 2>/dev/null || true
+    else
+        find "$BIND_DIR" -name '*.db' -exec chown 25:25 {} + 2>/dev/null || true
+        find "$BIND_DIR" -name '*.db' -exec chmod 644 {} + 2>/dev/null || true
+    fi
+}
+
 # Reload BIND after zone changes; require success so callers do not report "created" when
 # nothing was reloaded (or when the container restart fallback still failed).
 # Always use full "rndc reload" (all zones) — the reliable path for bind-mounted volume
@@ -324,6 +339,7 @@ __sync_bind_mount_writes() {
 # mounted files the same way a full reload does.
 __reload_bind_required() {
     __sync_bind_mount_writes
+    __chown_zone_files_for_named
     if ! __reload_bind; then
         print_status "error" "Zone files were updated on disk, but BIND reload failed (rndc and SIGHUP). Check: podman ps, podman logs $CONTAINER_NAME. Manual recovery: podman kill -s HUP $CONTAINER_NAME, or as last resort: podman restart $CONTAINER_NAME"
         return 1
