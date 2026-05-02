@@ -1301,6 +1301,31 @@ bc.delete_record() {
     fi
 }
 
+# Convert a BIND $TTL-style token (e.g. "86400", "1h", "1d") to seconds; empty if unknown.
+__ttl_token_to_seconds() {
+    local tok="${1#"${1%%[![:space:]]*}"}"
+    tok="${tok%"${tok##*[![:space:]]}"}"
+    [[ -z "$tok" ]] && return 0
+    if [[ "$tok" =~ ^[0-9]+$ ]]; then
+        printf '%s' "$tok"
+        return 0
+    fi
+    if [[ "$tok" =~ ^([0-9]+)([WwDdHhMmSs])$ ]]; then
+        local n="${BASH_REMATCH[1]}"
+        local u="${BASH_REMATCH[2]}"
+        case "$u" in
+            W | w) printf '%s' "$(( n * 604800 ))" ;;
+            D | d) printf '%s' "$(( n * 86400 ))" ;;
+            H | h) printf '%s' "$(( n * 3600 ))" ;;
+            M | m) printf '%s' "$(( n * 60 ))" ;;
+            S | s) printf '%s' "$n" ;;
+            *) return 0 ;;
+        esac
+        return 0
+    fi
+    printf ''
+}
+
 # Escape a string for use inside JSON double quotes (minimal DNS-safe set).
 __json_escape_str() {
     local s="$1"
@@ -1409,8 +1434,11 @@ bc.list_records() {
             printf "%-45s %-8s %s\n" "----" "----" "-----"
         fi
 
-        # Parse zone file and track $ORIGIN
+        # Parse zone file and track $ORIGIN / $TTL / effective TTL inheritance (BIND: omitted
+        # TTL uses previous RR; first RRs fall back to the last $TTL directive).
         local current_origin="$d."
+        local zone_default_ttl=""
+        local last_rr_ttl=""
         local count=0
         local in_multiline=false
 
@@ -1432,6 +1460,13 @@ bc.list_records() {
             if [[ "$line" =~ ^\$ORIGIN[[:space:]]+(.+) ]]; then
                 current_origin="${BASH_REMATCH[1]}"
                 [[ ! "$current_origin" =~ \.$ ]] && current_origin="${current_origin}."
+                continue
+            fi
+
+            # BIND $TTL: default when later RRs omit the TTL field
+            if [[ "$line" =~ ^[[:space:]]*\$TTL[[:space:]]+([^;]+) ]]; then
+                read -r _ttl_tok _ <<< "${BASH_REMATCH[1]}"
+                zone_default_ttl="$(__ttl_token_to_seconds "$_ttl_tok")"
                 continue
             fi
 
@@ -1465,6 +1500,19 @@ bc.list_records() {
                 continue
             fi
 
+            local explicit_ttl="$ttl"
+            local effective_ttl=""
+            if [[ -n "$explicit_ttl" ]]; then
+                effective_ttl="$explicit_ttl"
+            elif [[ -n "$last_rr_ttl" ]]; then
+                effective_ttl="$last_rr_ttl"
+            elif [[ -n "$zone_default_ttl" ]]; then
+                effective_ttl="$zone_default_ttl"
+            fi
+            if [[ -n "$effective_ttl" ]]; then
+                last_rr_ttl="$effective_ttl"
+            fi
+
             if [ "$type" == "SOA" ]; then
                 [[ "$value" =~ \( ]] && in_multiline=true
                 continue
@@ -1494,8 +1542,8 @@ bc.list_records() {
 
             if [ "$json_output" = true ]; then
                 local ttl_json
-                if [ -n "$ttl" ]; then
-                    ttl_json="$ttl"
+                if [ -n "$effective_ttl" ]; then
+                    ttl_json="$effective_ttl"
                 else
                     ttl_json="null"
                 fi
