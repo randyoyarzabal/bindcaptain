@@ -31,7 +31,7 @@ fi
 
 # Drop every secondary push URL on origin until none remain (then git uses fetch URL for push).
 while pu="$(git config --get remote.origin.pushurl 2>/dev/null)"; do
-  git remote set-url --push --delete "$pu"
+  git remote set-url --push --delete origin "$pu"
 done || true
 
 git remote set-url origin "$GITHUB_URL"
