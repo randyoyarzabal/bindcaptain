@@ -1,0 +1,399 @@
+# BindCaptain Management Cheat Sheet
+
+Quick reference for day-to-day BindCaptain operations. Substitute the
+`<PLACEHOLDERS>` below with your own values.
+
+**Install dir:** `/opt/bindcaptain` (default for systemd installs)
+**Container name:** `bindcaptain`
+**DNS IP:** `<PRIMARY-IP>:53` — whatever your `listen-on` advertises
+
+---
+
+## Directory Layout
+```
+/opt/bindcaptain/
+├── config/                          # ← YOUR DNS CONFIGS (mounted in container)
+│   ├── named.conf                   # Main BIND configuration
+│   ├── example.com/example.com.db   # example.com zone file
+│   ├── mydomain.net/                # mydomain.net domain
+│   │   ├── mydomain.net.db          # Forward zone
+│   │   ├── 1.0.10.in-addr.arpa.db   # Reverse zones (one per /24)
+│   │   ├── 2.0.10.in-addr.arpa.db
+│   │   └── 3.0.10.in-addr.arpa.db
+│   └── named.ca                     # Root hints file
+├── logs/                            # Log files
+├── bindcaptain.sh                   # Container management script
+├── tools/
+│   ├── bindcaptain_manager.sh       # DNS record management (bc.*)
+│   └── bindcaptain_refresh.sh       # Auto-refresh script (cron)
+```
+
+---
+
+## Container Management
+
+### Basic Operations
+```bash
+# Container status
+sudo podman ps --filter name=bindcaptain
+
+# Start container
+sudo podman start bindcaptain
+
+# Stop container  
+sudo podman stop bindcaptain
+
+# Restart container
+sudo podman restart bindcaptain
+
+# View logs (live)
+sudo podman logs -f bindcaptain
+
+# View recent logs
+sudo podman logs --tail 20 bindcaptain
+```
+
+### Using BindCaptain Script
+```bash
+cd /opt/bindcaptain
+
+# Container status and info
+sudo ./bindcaptain.sh status
+
+# View logs
+sudo ./bindcaptain.sh logs
+
+# Force rebuild (if needed)
+sudo ./bindcaptain.sh build
+```
+
+---
+
+## Managing DNS Records (Using BindCaptain Manager)
+
+**⚠ IMPORTANT:** Always use the BindCaptain manager functions - never edit zone files manually!
+
+### Loading the Manager
+
+Source the manager once per shell (or add to your shell profile on the DNS host):
+
+```bash
+# From repo directory
+source ./tools/bindcaptain_manager.sh
+
+# When installed (e.g. production)
+source /opt/bindcaptain/tools/bindcaptain_manager.sh
+```
+
+For remote use, load the [Chief bc plugin](../chief-plugin/README.md) instead; it runs these commands on the host via SSH. Then run `bc.*` commands in that shell (as root on the host, or via Chief from your workstation):
+
+```bash
+bc.create_record --help   # Show help for any bc.* command
+bc.help                   # List all commands
+```
+
+### Adding A Records
+```bash
+# Syntax: bc.create_record <hostname> <domain> <ip_address> [ttl]
+bc.create_record newserver example.com 192.168.1.100
+
+# With custom TTL
+bc.create_record webserver example.com 192.168.1.200 3600
+```
+
+### Adding CNAME Records
+```bash
+# Syntax: bc.create_cname <alias> <domain> <target>
+bc.create_cname www example.com newserver
+
+# Point to external domain
+bc.create_cname ftp example.com newserver.example.com.
+```
+
+### Adding TXT Records
+```bash
+# Syntax: bc.create_txt <name> <domain> <text_value>
+bc.create_txt @ example.com 'v=spf1 include:_spf.google.com ~all'
+
+# DMARC record
+bc.create_txt _dmarc example.com 'v=DMARC1; p=none'
+```
+
+### Deleting Records
+```bash
+# Syntax: bc.delete_record <name> <domain> [record_type]
+bc.delete_record oldserver example.com
+
+# Delete specific record type
+bc.delete_record www example.com CNAME
+```
+
+### Viewing Records
+```bash
+# List all records for all domains
+bc.list_records
+
+# List records for specific domain
+bc.list_records example.com
+
+# List specific record type
+bc.list_records example.com A
+```
+
+### **Auto-Management Features**
+- **✓ Serial numbers** automatically incremented
+- **✓ Zone validation** before applying changes  
+- **✓ Automatic backups** before modifications
+- **✓ BIND reload** after successful changes
+- **✓ Rollback** on validation failures
+
+### Zone File Template
+```dns
+$ORIGIN .
+$TTL 86400
+domain.com         IN SOA   ns1.domain.com. admin.domain.com. (
+                            2025092401  ; serial (YYYYMMDDNN)
+                            43200       ; refresh (12 hours)
+                            180         ; retry (3 minutes)  
+                            1209600     ; expire (2 weeks)
+                            10800       ; minimum (3 hours)
+                            )
+                   NS      ns1.domain.com.
+
+$ORIGIN domain.com.
+; A Records
+hostname           IN      A       192.168.1.100
+ns1                IN      A       192.168.1.1
+
+; CNAME Records  
+www                IN      CNAME   hostname
+```
+
+---
+
+## Configuration Updates
+
+### Modify BIND Configuration
+```bash
+# Edit main config
+sudo vi /opt/bindcaptain/config/named.conf
+
+# Validate configuration
+sudo podman exec bindcaptain named-checkconf
+
+# Restart container to apply
+sudo podman restart bindcaptain
+```
+
+### Add New Domain/Zone
+```bash
+# 1. Create directory and zone file
+sudo mkdir -p /opt/bindcaptain/config/newdomain.com
+sudo cp /opt/bindcaptain/config-examples/example.com/example.com.db \
+        /opt/bindcaptain/config/newdomain.com/newdomain.com.db
+
+# 2. Edit zone file
+sudo vi /opt/bindcaptain/config/newdomain.com/newdomain.com.db
+
+# 3. Add zone to named.conf
+sudo vi /opt/bindcaptain/config/named.conf
+# Add:
+# zone "newdomain.com" IN {
+#     type primary;
+#     file "newdomain.com/newdomain.com.db";
+#     check-names warn;
+#     notify primary-only;
+#     also-notify { <SECONDARY-IP>; <SECONDARY-IP-2>; };
+#     allow-transfer { <SECONDARY-IP>; <SECONDARY-IP-2>; };
+#     allow-query { any; };
+# };
+
+# 4. Restart container
+sudo podman restart bindcaptain
+```
+
+---
+
+## Validation & Testing
+
+### Validate Before Changes
+```bash
+# Check configuration
+sudo podman exec bindcaptain named-checkconf
+
+# Check specific zone
+sudo podman exec bindcaptain named-checkzone example.com /var/named/example.com/example.com.db
+sudo podman exec bindcaptain named-checkzone mydomain.net /var/named/mydomain.net/mydomain.net.db
+
+# Or validate from host
+sudo named-checkzone example.com /opt/bindcaptain/config/example.com/example.com.db
+```
+
+### Test DNS Resolution  
+```bash
+# Test forward DNS
+dig @<PRIMARY-IP> host.example.com
+dig @<PRIMARY-IP> host.example.net
+
+# Test reverse DNS  
+dig @<PRIMARY-IP> -x <PRIMARY-IP>
+
+# Test from external
+dig @<PRIMARY-IP> primary.example.com +short
+
+# Check NS records
+dig @<PRIMARY-IP> example.com NS
+```
+
+---
+
+## Monitoring & Logs
+
+### View Logs
+```bash
+# Container logs
+sudo podman logs bindcaptain | tail -20
+
+# DNS refresh automation logs
+sudo tail -f /opt/bindcaptain/logs/dns_refresh.log
+
+# Cron logs  
+sudo tail -f /opt/bindcaptain/logs/cron.log
+
+# System cron logs
+sudo journalctl -u crond -f
+```
+
+### Monitor Performance
+```bash
+# Container resource usage
+sudo podman stats bindcaptain
+
+# Check if container is responding
+dig @<PRIMARY-IP> . +short
+
+# View active queries (if logging enabled)
+sudo podman exec bindcaptain tail -f /var/log/named/named.log
+```
+
+---
+
+## Automation & Maintenance
+
+### Reverse DNS Automation
+**Note**: As of BindCaptain v2.1+, PTR records are created automatically when A records are added. No cron jobs or external tools required.
+
+```bash
+# PTR records are created inline - no separate commands needed
+bc.create_record hostname domain.com 192.168.1.100
+# ↑ Creates both A record AND PTR record automatically
+
+# Legacy refresh script still available for manual validation
+sudo /opt/bindcaptain/tools/bindcaptain_refresh.sh
+```
+
+### Backup Configuration
+```bash
+# Backup entire config
+sudo tar -czf /opt/bindcaptain-backup-$(date +%Y%m%d).tar.gz /opt/bindcaptain/config/
+
+# Backup specific zone
+sudo cp /opt/bindcaptain/config/example.com/example.com.db \
+        /opt/bindcaptain/config/example.com/example.com.db.backup.$(date +%Y%m%d)
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Container Won't Start:**
+```bash
+# Check logs for errors
+sudo podman logs bindcaptain
+
+# Check if port is in use
+sudo ss -tlnp | grep :53
+
+# Check configuration
+sudo podman exec bindcaptain named-checkconf
+```
+
+**DNS Not Resolving:**
+```bash
+# Check if BIND is listening
+sudo podman exec bindcaptain ss -tlnp | grep :53
+
+# Check container ports
+sudo podman port bindcaptain
+
+# Test locally first
+dig @127.0.0.1 hostname.domain.com
+```
+
+**Zone File Errors:**
+```bash
+# Always validate after editing
+sudo named-checkzone domain.com /opt/bindcaptain/config/domain.com/domain.com.db
+
+# Common issues:
+# - Missing trailing dots in CNAMEs  
+# - Forgot to increment serial number
+# - Missing newline at end of file
+# - Incorrect file permissions
+```
+
+**Permission Issues:**
+```bash
+# Fix file ownership
+sudo chown -R named:named /opt/bindcaptain/config/
+
+# Fix permissions
+sudo find /opt/bindcaptain/config/ -name "*.db" -exec chmod 644 {} \;
+sudo chmod 640 /opt/bindcaptain/config/named.conf
+```
+
+### Emergency Recovery
+```bash
+# Stop container
+sudo podman stop bindcaptain
+
+# Restore from backup
+sudo tar -xzf /opt/bindcaptain-backup-YYYYMMDD.tar.gz -C /
+
+# Start container
+sudo podman start bindcaptain
+```
+
+---
+
+## Quick Commands Summary
+
+| Task | Command |
+|------|---------|
+| **Container Status** | `sudo podman ps --filter name=bindcaptain` |
+| **Restart DNS** | `sudo podman restart bindcaptain` |
+| **View Logs** | `sudo podman logs bindcaptain \| tail -20` |
+| **Edit Zone** | `sudo vi /opt/bindcaptain/config/domain/domain.db` |
+| **Validate Zone** | `sudo named-checkzone domain /opt/bindcaptain/config/domain/domain.db` |
+| **Test DNS** | `dig @<PRIMARY-IP> hostname.domain.com` |
+| **Manual Refresh** | `sudo /opt/bindcaptain/tools/bindcaptain_refresh.sh` |
+| **Backup Config** | `sudo tar -czf backup.tar.gz /opt/bindcaptain/config/` |
+
+---
+
+## Pro Tips
+
+1. **Always increment serial numbers** after zone changes
+2. **Validate before restarting** - use `named-checkzone` and `named-checkconf`  
+3. **Edit files directly** on host - no need to go into container
+4. **Monitor logs** - especially after changes
+5. **Backup before major changes** - zone files are small
+6. **Use meaningful serial numbers** - YYYYMMDDNN format recommended
+7. **Test locally first** - use `dig @<PRIMARY-IP>` for testing
+8. **Let cron handle reverse DNS** - it runs every 5 minutes automatically
+
+---
+
+**Need Help?** Check logs first: `sudo podman logs bindcaptain | tail -20`
