@@ -1442,7 +1442,8 @@ bc.list_records() {
         local count=0
         local in_multiline=false
 
-        while IFS= read -r line; do
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            line="${line%$'\r'}"
             # Skip comments and empty lines
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ "$line" =~ ^[[:space:]]*\; ]] && continue
@@ -1451,6 +1452,15 @@ bc.list_records() {
             # Skip continuation lines (indented lines from multi-line records like SOA)
             if [[ "$in_multiline" == true ]]; then
                 if [[ "$line" =~ \) ]]; then
+                    # BIND: when $TTL is absent, SOA RRset uses fields before ); last is minimum (Nxdomain).
+                    # Use it only as fallback default so later RRs without explicit TTL aren't JSON null.
+                    if [[ "$line" =~ ([0-9]+)[[:space:]]*\) ]]; then
+                        local soa_min="${BASH_REMATCH[1]}"
+                        if [[ -n "$soa_min" ]]; then
+                            [[ -z "$zone_default_ttl" ]] && zone_default_ttl="$soa_min"
+                            [[ -z "$last_rr_ttl" ]] && last_rr_ttl="$soa_min"
+                        fi
+                    fi
                     in_multiline=false
                 fi
                 continue
