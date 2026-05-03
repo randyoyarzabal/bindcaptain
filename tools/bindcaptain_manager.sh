@@ -13,30 +13,50 @@
 #   sudo ./tools/bindcaptain_manager.sh refresh
 #
 # FUNCTIONS:
-#   bc.create_record    - Create DNS A record
-#   bc.create_cname     - Create DNS CNAME record
-#   bc.create_txt       - Create DNS TXT record
-#   bc.delete_record    - Delete DNS record
-#   bc.list_records     - List DNS records
-#   bc.refresh           - Refresh and validate DNS configuration
-#   bc.sync_ptr_from_forwards - Rebuild PTR zones from forward A records
-#   bc.show_environment  - Show environment information
-#   bc.help              - Show help
+#   Low-level primitives (record write ops support A / CNAME / TXT only):
+#     bc.create_record  - Create DNS A record
+#     bc.create_cname   - Create DNS CNAME record (no TTL arg)
+#     bc.create_txt     - Create DNS TXT record
+#     bc.delete_record  - Delete DNS record (optional record-type filter)
+#     bc.list_records   - List DNS records (--json|-j supported)
+#
+#   Short-name dispatchers (parity with the Chief plugin's bc.*):
+#     bc.create [A|CNAME|TXT] ...   -> bc.create_record / bc.create_cname / bc.create_txt
+#     bc.delete ...                  -> bc.delete_record
+#     bc.list   ...                  -> bc.list_records
+#
+#   Maintenance & service control:
+#     bc.refresh                  - Validate zones and reload BIND
+#     bc.sync_ptr_from_forwards   - Rebuild managed PTR zones from forward A records
+#     bc.git_refresh              - git pull on the BindCaptain repo on the host
+#     bc.status / bc.start / bc.stop / bc.restart - Service control (systemctl + podman)
+#     bc.ssh                      - No-op on host (the Chief plugin uses this name to open SSH)
+#     bc.show_environment         - Show paths, domains, container status
+#     bc.help                     - Show help
+#
+#   Aliases: bc.a=bc.create  bc.ls=bc.list  bc.rm=bc.delete
+#            bc.cname=bc.create_cname  bc.txt=bc.create_txt
+#
+#   Note: there is no bc.update on the host. To change a record, run
+#         bc.delete_record + bc.create_record (BIND reloads twice). Use
+#         the Chief plugin's bc.update for a single-reload remote update.
 #
 # EXAMPLES:
-#   # Create A record
+#   # Create A record (either form)
 #   bc.create_record webserver example.com 192.168.1.100
+#   bc.create        webserver.example.com 192.168.1.100
 #
-#   # Create CNAME record
+#   # Create CNAME / TXT
 #   bc.create_cname www example.com webserver
+#   bc.create_txt   @   example.com "v=spf1 -all"
 #
-#   # Create TXT record
-#   bc.create_txt @ example.com "v=spf1 -all"
-#
-#   # List all records
+#   # List all records (or one zone, optionally as JSON)
 #   bc.list_records
+#   bc.list_records example.com A
+#   bc.list_records --json example.com
 #
-#   # Refresh DNS configuration
+#   # Refresh DNS configuration (also as a script)
+#   bc.refresh
 #   ./tools/bindcaptain_manager.sh refresh
 #
 # FEATURES:
@@ -1609,23 +1629,29 @@ __show_environment() {
 # Function: bc.help
 bc.help() {
     __print_manager_header
-    echo -e "${WHITE}Available Commands (same API on host and via Chief plugin):${NC}"
+    echo -e "${WHITE}In-container manager — host-local DNS commands${NC}"
+    echo -e "${CYAN}For remote / single-reload updates / --json output, use the Chief plugin (chief-plugin/bc_chief-plugin.sh).${NC}"
     echo
-    echo -e "  ${GREEN}bc.create${NC} / ${GREEN}bc.create_record${NC}  - Create DNS record (A default)"
-    echo -e "  ${GREEN}bc.create_cname${NC}   - Create CNAME record"
+    echo -e "  ${GREEN}bc.create${NC} / ${GREEN}bc.create_record${NC}  - Create DNS record (A default; CNAME/TXT via type dispatch)"
+    echo -e "  ${GREEN}bc.create_cname${NC}   - Create CNAME record (no TTL arg)"
     echo -e "  ${GREEN}bc.create_txt${NC}     - Create TXT record"
-    echo -e "  ${GREEN}bc.delete${NC} / ${GREEN}bc.delete_record${NC}  - Delete DNS record"
-    echo -e "  ${GREEN}bc.list${NC} / ${GREEN}bc.list_records${NC}   - List records (optional ${CYAN}--json|-j${NC})"
+    echo -e "  ${GREEN}bc.delete${NC} / ${GREEN}bc.delete_record${NC}  - Delete DNS record (optional record-type filter)"
+    echo -e "  ${GREEN}bc.list${NC} / ${GREEN}bc.list_records${NC}   - List records (optional ${CYAN}--json|-j${NC}, domain, type)"
     echo -e "  ${GREEN}bc.refresh${NC}         - Validate zones and reload BIND"
-    echo -e "  ${GREEN}bc.sync_ptr_from_forwards${NC} - Rebuild lab PTR zones from forward A records"
+    echo -e "  ${GREEN}bc.sync_ptr_from_forwards${NC} - Rebuild managed PTR reverse zones from forward A records"
     echo -e "  ${GREEN}bc.git_refresh${NC}     - Update ⚓BindCaptain from Git"
     echo -e "  ${GREEN}bc.status${NC}          - Show service and container status"
     echo -e "  ${GREEN}bc.start${NC} / ${GREEN}bc.stop${NC} / ${GREEN}bc.restart${NC} - Service control"
     echo -e "  ${GREEN}bc.show_environment${NC} - Show paths and domains"
-    echo -e "  ${GREEN}bc.ssh${NC}             - (Remote only: open SSH; on host: no-op)"
-    echo -e "  ${GREEN}bc.help${NC}             - Show this help"
+    echo -e "  ${GREEN}bc.ssh${NC}             - No-op on host (the Chief plugin uses this name to open SSH)"
+    echo -e "  ${GREEN}bc.help${NC}            - Show this help"
     echo
     echo -e "  Aliases: ${CYAN}bc.a${NC}=bc.create ${CYAN}bc.ls${NC}=bc.list ${CYAN}bc.rm${NC}=bc.delete ${CYAN}bc.cname${NC}=bc.create_cname ${CYAN}bc.txt${NC}=bc.create_txt"
+    echo
+    echo -e "${YELLOW}Note:${NC} no ${GREEN}bc.update${NC} on the host — to change a record, run ${GREEN}bc.delete_record${NC} then ${GREEN}bc.create_record${NC}"
+    echo "  (BIND reloads twice). Use the Chief plugin's ${GREEN}bc.update${NC} for a single-reload remote update."
+    echo
+    echo -e "${YELLOW}Supported types for write ops:${NC} A, CNAME, TXT (anything else is rejected)"
     echo
     echo -e "${YELLOW}Usage:${NC}"
     echo "  bc.create [A|CNAME|TXT] ...   or   bc.create_record --help"

@@ -125,29 +125,57 @@ sudo ./bindcaptain.sh start|stop|restart|service-status
 
 ### DNS Record Management
 
-**Load the manager** in your shell (once per session, or add to your shell profile on the DNS host):
+BindCaptain exposes **two distinct `bc.*` command surfaces**. Most users only ever touch the first one:
+
+| Surface | Where it’s sourced | Primary use case | Commands |
+|---|---|---|---|
+| **Chief plugin (`bc_chief-plugin.sh`)** | Operator/workstation shell, via [Chief](https://github.com/randyoyarzabal/chief) — or directly on the DNS host with `BC_HOST` unset | **Day-to-day DNS edits** (local or remote). Wraps the in-container manager over SSH, normalizes output, and supports `--json`. | `bc.create`, `bc.update`, `bc.delete`, `bc.list`, `bc.refresh`, `bc.sync_ptr`, plus `bc.create_cname` / `bc.create_txt` shortcuts |
+| **In-container manager (`bindcaptain_manager.sh`)** | Sourced **inside the container scope** (or via `sudo bash -c 'source $BC_MANAGER && …'`) on the DNS host | Low-level direct calls — what the Chief wrappers dispatch to under the hood. Useful for debugging or scripted host-local automation. | `bc.create_record`, `bc.create_cname`, `bc.create_txt`, `bc.delete_record`, `bc.list_records` |
+
+> **Important:** `bc.create_record` / `bc.delete_record` / `bc.list_records` (the `_record`-suffixed names) **only exist** when the in-container manager is sourced. From a normal operator shell with the Chief plugin loaded, only the high-level wrappers (`bc.create`, `bc.delete`, `bc.list`, …) are present — verify with `bc.<TAB>` completion.
+
+**Recommended usage — Chief plugin wrappers** (load the plugin, then run the same commands locally on the DNS host or remotely from your workstation; see [Chief bc plugin](chief-plugin/README.md)):
 
 ```bash
-# From repo directory:
-source ./tools/bindcaptain_manager.sh
+# Add records (TYPE defaults to A; CNAME / TXT supported)
+bc.create webserver.yourdomain.com 192.168.1.100
+bc.create CNAME www.yourdomain.com webserver
+bc.create TXT @ yourdomain.com "v=spf1 -all"
 
-# When installed under /opt/bindcaptain:
+# Update / delete
+bc.update webserver.yourdomain.com 192.168.1.200
+bc.delete webserver.yourdomain.com
+
+# List (machine-readable with --json)
+bc.list yourdomain.com
+bc.list yourdomain.com --json
+```
+
+Write operations (`bc.create` / `bc.update`) accept **only `A`, `CNAME`, and `TXT`** — anything else is rejected with `Unsupported record type`.
+
+<details>
+<summary>Low-level / direct-on-host (in-container manager)</summary>
+
+These are only callable when the manager is sourced inside the container scope:
+
+```bash
+# On the DNS host, as root:
+sudo bash -c 'source /opt/bindcaptain/tools/bindcaptain_manager.sh && \
+  bc.create_record webserver yourdomain.com 192.168.1.100'
+
+# Or load it into your root shell for repeated use:
 source /opt/bindcaptain/tools/bindcaptain_manager.sh
+
+bc.create_record webserver yourdomain.com 192.168.1.100   # A
+bc.create_cname  www       yourdomain.com webserver        # CNAME
+bc.create_txt    @         yourdomain.com "v=spf1 -all"    # TXT
+bc.delete_record webserver.yourdomain.com [TYPE]
+bc.list_records  yourdomain.com
 ```
 
-To have it loaded automatically when you log in as root, add one of the lines above to root’s `~/.bashrc` or `~/.profile`. For remote management from your workstation, use the [Chief bc plugin](chief-plugin/README.md).
+To auto-load on root login on the DNS host, add the `source …/bindcaptain_manager.sh` line to root’s `~/.bashrc` or `~/.profile`.
 
-Then run `bc.*` commands (as root on the DNS host):
-
-```bash
-# Add records
-bc.create_record webserver yourdomain.com 192.168.1.100
-bc.create_cname www yourdomain.com webserver
-bc.create_txt @ yourdomain.com "v=spf1 -all"
-
-# List records
-bc.list_records yourdomain.com
-```
+</details>
 
 > **Advanced DNS operations?** See [DNS Operations Guide](docs/dns-operations.md) for comprehensive record management and zone configuration.
 
@@ -157,11 +185,14 @@ bc.list_records yourdomain.com
 # Container Management
 sudo ./bindcaptain.sh build|run|stop|restart|logs|status
 
-# Service Management  
+# Service Management
 sudo ./bindcaptain.sh install|uninstall|enable|disable|start|stop-service
 
-# DNS Management
-bc.create_record|bc.create_cname|bc.create_txt|bc.delete_record|bc.list_records
+# DNS Management — Chief plugin wrappers (operator/remote shell)
+bc.create | bc.update | bc.delete | bc.list | bc.refresh | bc.sync_ptr
+
+# DNS Management — in-container manager (sourced on the DNS host)
+bc.create_record | bc.create_cname | bc.create_txt | bc.delete_record | bc.list_records
 ```
 
 > **Complete command reference?** See [Cheat Sheet](docs/cheat-sheet.md) for all available commands and examples.

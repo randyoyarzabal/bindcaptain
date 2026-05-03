@@ -65,55 +65,66 @@ If your Chief build uses a different command for the same action, use that inste
 
 ## Commands (summary)
 
-After loading the plugin:
+After loading the plugin. Signatures match `chief-plugin/bc_chief-plugin.sh` verbatim. **Write operations only support `A`, `CNAME`, and `TXT`** — anything else is rejected with `Unsupported record type`.
 
 | Command | Description |
 |---------|-------------|
-| `bc.create <fqdn> <ip>` | Create A record (and PTR when applicable). |
-| `bc.create_cname <fqdn> <target>` | Create CNAME record. |
-| `bc.create_txt <name> <domain> <value>` | Create TXT record. |
-| `bc.delete <fqdn> [type]` | Delete a DNS record. |
-| `bc.list [domain]` | List records (all zones or one domain). |
-| `bc.refresh` | Validate and reload BIND on the remote. |
+| `bc.create [A] <fqdn> <ip> [ttl] [--json]` | Create A record (PTR auto-created for managed networks). Hostname+domain form also supported. `A` is the default type when omitted. |
+| `bc.create CNAME <fqdn> <target> [--json]` | Create CNAME record. |
+| `bc.create TXT <name> <domain> <value> [--json]` | Create TXT record (use `@` for zone apex). |
+| `bc.create_cname <fqdn> <target> [--json]` | Shortcut for `bc.create CNAME …`. |
+| `bc.create_txt <name> <domain> <value> [--json]` | Shortcut for `bc.create TXT …`. |
+| `bc.update [A\|CNAME\|TXT] <fqdn> <new_value> [ttl] [--json]` | Update a record (delete + recreate in one SSH session, single BIND reload). Also accepts `--json '<json-object>'` input. |
+| `bc.delete <fqdn> [type] [--json]` | Delete a DNS record (optionally restricted to `type`). |
+| `bc.list [domain] [--json\|-j]` | List records (all zones or one domain); JSON array on `--json`. |
+| `bc.refresh [--json]` | Validate zones and reload BIND on the remote. |
+| `bc.sync_ptr [--json]` | Rewrite managed reverse zones so PTRs match forward A records. |
 | `bc.git_refresh` | Run `git pull` in the BindCaptain repo on the remote. |
 | `bc.status` | Show BindCaptain service and container status. |
 | `bc.start` / `bc.stop` / `bc.restart` | Control the BindCaptain systemd service. |
 | `bc.ssh` | Open an interactive SSH session to the BindCaptain host. |
 | `bc.help` | Show full usage and current `BC_HOST` / `BC_MANAGER`. |
 
+**Aliases:** `bc.a`=`bc.create`, `bc.up`=`bc.update`, `bc.cname`=`bc.create_cname`, `bc.txt`=`bc.create_txt`, `bc.rm`=`bc.delete`, `bc.ls`=`bc.list`.
+
 ## Examples
 
 ```bash
-# Create A record
+# Create A record (FQDN form; hostname+domain form also accepted)
 bc.create webserver.example.com 192.0.2.100
+bc.create webserver example.com 192.0.2.100 3600        # explicit TTL
+bc.create webserver.example.com 192.0.2.100 --json       # JSON output
 
-# Create CNAME
-bc.create_cname www.example.com webserver
+# Create CNAME / TXT
+bc.create CNAME www.example.com webserver
+bc.create TXT   @   example.com "v=spf1 -all"
+bc.create_cname www.example.com webserver                # shortcut form
+bc.create_txt   @   example.com "v=spf1 -all"            # shortcut form
 
-# TXT record
-bc.create_txt @ example.com "v=spf1 -all"
+# Update an existing record (delete+create in one session, one BIND reload)
+bc.update webserver.example.com 192.0.2.200
+bc.update CNAME www.example.com newtarget
+bc.update --json '{"type":"A","fqdn":"web.example.com","rdata":"192.0.2.200","ttl":3600}'
 
-# List records
+# List / delete
 bc.list example.com
-
-# Delete record
+bc.list example.com --json
 bc.delete webserver.example.com
+bc.delete www.example.com CNAME --json
 
-# Refresh BIND config on remote
-bc.refresh
-
-# Update BindCaptain from Git on remote
-bc.git_refresh
-
-# SSH to the BindCaptain host
-bc.ssh
+# Maintenance
+bc.refresh           # validate + reload BIND on the remote
+bc.sync_ptr          # rebuild managed PTR zones from forward A records
+bc.git_refresh       # update BindCaptain on the remote
+bc.ssh               # interactive SSH session to BC_HOST
 ```
 
 ## How it works
 
 - The plugin is **sourced** in your local shell (never run as `./bc_chief-plugin.sh`).
-- Each `bc.*` command uses `ssh $BC_HOST` to run the corresponding operation on the remote host.
-- DNS record operations run `source $BC_MANAGER && bc.create_record ...` (and similar) on the remote, so the same logic as [bindcaptain_manager.sh](dns-operations.md) is used there.
+- Each `bc.*` command uses `ssh $BC_HOST` to run the corresponding operation on the remote host (or runs locally when `BC_HOST` is unset).
+- DNS record operations run `sudo bash -c 'source $BC_MANAGER && bc.create_record …'` (and similar low-level primitives) on the remote, so the same logic as [bindcaptain_manager.sh](dns-operations.md) is used there.
+- `bc.update` issues a single `delete + create` script over one SSH session so BIND reloads only at the end.
 - Service commands run `systemctl` and `podman` on the remote.
 
 ## Troubleshooting

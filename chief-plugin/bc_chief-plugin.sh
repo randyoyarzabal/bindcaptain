@@ -42,12 +42,19 @@
 #   After changing this file or if bc.* is missing in an open shell: chief.reload
 #
 # COMMANDS (see bc.help after loading)
-#   bc.create, bc.create_cname, bc.create_txt  - Create DNS records
+#   bc.create, bc.create_cname, bc.create_txt  - Create DNS records (A / CNAME / TXT)
+#   bc.update                                  - Update DNS record (delete + recreate, single reload)
 #   bc.delete, bc.list                         - Delete / list records
 #   bc.refresh, bc.sync_ptr                    - Refresh config / PTR rebuild from A records
 #   bc.git_refresh                             - Update from Git
 #   bc.status, bc.start, bc.stop, bc.restart  - Service control
 #   bc.ssh, bc.help                            - SSH to host / show help
+#   Aliases: bc.a=bc.create, bc.up=bc.update, bc.cname=bc.create_cname,
+#            bc.txt=bc.create_txt, bc.rm=bc.delete, bc.ls=bc.list
+#
+# WRITE OPERATIONS
+#   bc.create / bc.update only support record types A, CNAME, TXT —
+#   anything else returns "Unsupported record type".
 #
 # See also: BindCaptain docs/chief-remote-plugin.md
 #

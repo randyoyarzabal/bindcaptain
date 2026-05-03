@@ -205,17 +205,20 @@ sudo systemctl enable bindcaptain
 
 ### DNS Management
 
-Load management functions:
+Load the Chief plugin (works locally on the DNS host with `BC_HOST` unset, and remotely from a workstation when `BC_HOST` is set):
 
 ```bash
-source ./tools/bindcaptain_manager.sh
+source ./chief-plugin/bc_chief-plugin.sh
+# or, when installed: source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
 ```
 
 Create your first DNS record:
 
 ```bash
-bc.create_record webserver example.com 192.168.1.100
+bc.create webserver.example.com 192.168.1.100
 ```
+
+> See [DNS Operations](dns-operations.md) for the full command reference (Chief plugin + in-container manager).
 
 ### Monitoring Setup
 

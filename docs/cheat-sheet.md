@@ -69,74 +69,154 @@ sudo ./bindcaptain.sh build
 
 ---
 
-## Managing DNS Records (Using BindCaptain Manager)
+## Managing DNS Records
 
-**⚠ IMPORTANT:** Always use the BindCaptain manager functions - never edit zone files manually!
+**⚠ IMPORTANT:** Always use the `bc.*` commands - never edit zone files manually!
 
-### Loading the Manager
+BindCaptain ships **two distinct `bc.*` command surfaces**. Pick the right one:
 
-Source the manager once per shell (or add to your shell profile on the DNS host):
+| Surface | Where to source | What you get | When to use |
+|---|---|---|---|
+| **Chief plugin** (`chief-plugin/bc_chief-plugin.sh`) | Operator/workstation shell, via [Chief](https://github.com/randyoyarzabal/chief). Or directly on the DNS host with `BC_HOST` unset. | High-level wrappers: `bc.create`, `bc.update`, `bc.delete`, `bc.list`, `bc.refresh`, `bc.sync_ptr`, plus `bc.create_cname` / `bc.create_txt` shortcuts. Output is normalized; `--json` is supported. | **Default for day-to-day DNS edits**, local or remote. |
+| **In-container manager** (`tools/bindcaptain_manager.sh`) | Sourced **inside the container scope** on the DNS host (or via `sudo bash -c 'source $BC_MANAGER && …'`). | Low-level primitives: `bc.create_record`, `bc.create_cname`, `bc.create_txt`, `bc.delete_record`, `bc.list_records`. | Direct host-local debugging or scripted automation that already runs on the DNS host. |
+
+> **Important:** The `_record`-suffixed names (`bc.create_record`, `bc.delete_record`, `bc.list_records`) **do not exist** in a Chief-plugin operator shell — only the high-level wrappers are present. Tab-complete `bc.<TAB>` to confirm what’s loaded.
+
+### Loading the commands
 
 ```bash
-# From repo directory
-source ./tools/bindcaptain_manager.sh
+# Operator / remote workstation — Chief plugin (recommended)
+chief.plugin bc            # see chief-plugin/README.md for install
+# Or, on the DNS host directly, just source the plugin file with BC_HOST unset:
+source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
 
-# When installed (e.g. production)
+# Direct on the DNS host — in-container manager (low-level)
 source /opt/bindcaptain/tools/bindcaptain_manager.sh
+
+bc.help                   # list all commands available in the loaded surface
+bc.create --help          # per-command help (Chief plugin)
+bc.create_record --help   # per-command help (in-container manager)
 ```
 
-For remote use, load the [Chief bc plugin](../chief-plugin/README.md) instead; it runs these commands on the host via SSH. Then run `bc.*` commands in that shell (as root on the host, or via Chief from your workstation):
+---
 
+### Chief plugin wrappers (primary user-facing API)
+
+Signatures are taken verbatim from `chief-plugin/bc_chief-plugin.sh`. **Write operations only support `A`, `CNAME`, and `TXT`** — anything else returns `Unsupported record type`.
+
+#### Adding A records — `bc.create [A] <fqdn> <ip> [ttl]`
 ```bash
-bc.create_record --help   # Show help for any bc.* command
-bc.help                   # List all commands
+# Either FQDN form…
+bc.create newserver.example.com 192.168.1.100
+
+# …or hostname + domain form
+bc.create newserver example.com 192.168.1.100
+
+# With explicit TTL and JSON output
+bc.create webserver.example.com 192.168.1.200 3600 --json
+
+# Explicit type (A is the default)
+bc.create A webserver.example.com 192.168.1.200
 ```
 
-### Adding A Records
+#### Adding CNAME records — `bc.create CNAME <fqdn> <target>`
 ```bash
-# Syntax: bc.create_record <hostname> <domain> <ip_address> [ttl]
+# FQDN form
+bc.create CNAME www.example.com webserver
+
+# alias + domain form
+bc.create CNAME www example.com webserver
+
+# Point at an external target (trailing dot makes it absolute)
+bc.create CNAME ftp.example.com newserver.example.com.
+
+# Shortcut wrapper
+bc.create_cname www.example.com webserver
+```
+
+#### Adding TXT records — `bc.create TXT <name> <domain> <value>`
+```bash
+bc.create TXT @       example.com 'v=spf1 include:_spf.google.com ~all'
+bc.create TXT _dmarc  example.com 'v=DMARC1; p=none'
+
+# Shortcut wrapper
+bc.create_txt @ example.com 'v=spf1 -all'
+```
+
+#### Updating records — `bc.update [TYPE] <fqdn> <new_value> [ttl]`
+
+Implemented as a delete-then-create on the remote host inside one SSH session, so BIND only reloads at the end.
+
+```bash
+bc.update webserver.example.com 192.168.1.200            # change A IP
+bc.update webserver.example.com 192.168.1.200 3600        # also update TTL
+bc.update CNAME www.example.com newtarget                 # change CNAME target
+bc.update TXT   @   example.com 'v=spf1 -all'             # change TXT value
+
+# JSON input (useful for IPAM / Igor-style integrations)
+bc.update --json '{"type":"A","fqdn":"web.example.com","rdata":"192.0.2.200","ttl":3600}'
+```
+
+#### Deleting records — `bc.delete <fqdn> [TYPE]`
+```bash
+bc.delete oldserver.example.com               # deletes any matching record
+bc.delete oldserver example.com               # hostname + domain form
+bc.delete www.example.com CNAME               # restrict to a record type
+bc.delete www.example.com CNAME --json        # JSON output
+```
+
+#### Listing records — `bc.list [domain] [--json|-j]`
+```bash
+bc.list                       # all records, all domains
+bc.list example.com           # one domain
+bc.list example.com --json    # machine-readable JSON
+```
+
+#### Other Chief-plugin commands
+```bash
+bc.refresh           # validate all zones + reload BIND (--json supported)
+bc.sync_ptr          # rebuild managed PTR zones from forward A records
+bc.status / bc.start / bc.stop / bc.restart   # service control on the host
+bc.ssh               # open an SSH session to BC_HOST
+bc.git_refresh       # git-pull BindCaptain on the host
+```
+
+Aliases: `bc.a`=`bc.create`, `bc.up`=`bc.update`, `bc.cname`=`bc.create_cname`, `bc.txt`=`bc.create_txt`, `bc.rm`=`bc.delete`, `bc.ls`=`bc.list`.
+
+---
+
+### Low-level / direct-on-host (in-container manager)
+
+Only callable when `tools/bindcaptain_manager.sh` is sourced inside the container scope (or invoked via `sudo bash -c 'source $BC_MANAGER && …'`). The Chief-plugin wrappers above dispatch to these under the hood.
+
+```bash
+# A record
+#   bc.create_record [--backup] <fqdn> <ip> [ttl]
+#   bc.create_record [--backup] <hostname> <domain> <ip> [ttl]
 bc.create_record newserver example.com 192.168.1.100
+bc.create_record webserver.example.com 192.168.1.200 3600
 
-# With custom TTL
-bc.create_record webserver example.com 192.168.1.200 3600
-```
-
-### Adding CNAME Records
-```bash
-# Syntax: bc.create_cname <alias> <domain> <target>
+# CNAME
+#   bc.create_cname [--backup] <fqdn> <target>
+#   bc.create_cname [--backup] <alias> <domain> <target>
 bc.create_cname www example.com newserver
+bc.create_cname ftp.example.com newserver.example.com.
 
-# Point to external domain
-bc.create_cname ftp example.com newserver.example.com.
-```
+# TXT
+#   bc.create_txt [--backup] <name> <domain> <text_value>
+bc.create_txt @       example.com 'v=spf1 include:_spf.google.com ~all'
+bc.create_txt _dmarc  example.com 'v=DMARC1; p=none'
 
-### Adding TXT Records
-```bash
-# Syntax: bc.create_txt <name> <domain> <text_value>
-bc.create_txt @ example.com 'v=spf1 include:_spf.google.com ~all'
-
-# DMARC record
-bc.create_txt _dmarc example.com 'v=DMARC1; p=none'
-```
-
-### Deleting Records
-```bash
-# Syntax: bc.delete_record <name> <domain> [record_type]
+# Delete
+#   bc.delete_record [--backup] <fqdn> [record_type]
+#   bc.delete_record [--backup] <name> <domain> [record_type]
 bc.delete_record oldserver example.com
+bc.delete_record www.example.com CNAME
 
-# Delete specific record type
-bc.delete_record www example.com CNAME
-```
-
-### Viewing Records
-```bash
-# List all records for all domains
+# List
+#   bc.list_records [domain] [type]
 bc.list_records
-
-# List records for specific domain
 bc.list_records example.com
-
-# List specific record type
 bc.list_records example.com A
 ```
 
@@ -281,15 +361,20 @@ sudo podman exec bindcaptain tail -f /var/log/named/named.log
 ## Automation & Maintenance
 
 ### Reverse DNS Automation
-**Note**: As of BindCaptain v2.1+, PTR records are created automatically when A records are added. No cron jobs or external tools required.
+**Note**: PTR records are created automatically when A records are added (for IPs in managed reverse networks). No cron jobs or external tools required.
 
 ```bash
-# PTR records are created inline - no separate commands needed
-bc.create_record hostname domain.com 192.168.1.100
-# ↑ Creates both A record AND PTR record automatically
+# Chief plugin — creates A record AND PTR record automatically
+bc.create hostname.domain.com 192.168.1.100
 
-# Legacy refresh script still available for manual validation
-sudo /opt/bindcaptain/tools/bindcaptain_refresh.sh
+# In-container manager (low-level, on the host) — same automatic PTR
+bc.create_record hostname domain.com 192.168.1.100
+
+# Force a full revalidation + reload
+bc.refresh
+# Or rebuild PTR zones from forward A records
+bc.sync_ptr        # Chief plugin
+# bc.sync_ptr_from_forwards   # in-container manager name
 ```
 
 ### Backup Configuration

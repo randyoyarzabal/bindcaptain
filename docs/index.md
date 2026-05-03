@@ -70,9 +70,9 @@ sudo ./tools/config-setup.sh wizard
 sudo ./bindcaptain.sh build
 sudo ./bindcaptain.sh run
 
-# 5. Manage DNS records
-source ./tools/bindcaptain_manager.sh
-bc.create_record webserver example.com 192.168.1.100
+# 5. Manage DNS records (Chief plugin — works locally and remotely)
+source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
+bc.create webserver.example.com 192.168.1.100
 ```
 
 ### Manual Setup (Unsupported Distributions)
@@ -91,21 +91,24 @@ sudo ./bindcaptain.sh run
 
 ### DNS Management
 
-```bash
-# Load management functions
-source ./tools/bindcaptain_manager.sh
+BindCaptain ships **two `bc.*` surfaces**: the Chief plugin (operator-facing wrappers — `bc.create`, `bc.update`, `bc.delete`, `bc.list`, `bc.refresh`, `bc.sync_ptr`) and the in-container manager (low-level primitives — `bc.create_record`, `bc.create_cname`, `bc.create_txt`, `bc.delete_record`, `bc.list_records`). For day-to-day use, prefer the Chief plugin — it works the same locally on the DNS host and remotely from a workstation. See [DNS Operations](dns-operations.md) and [Chief Remote Plugin](chief-remote-plugin.md) for details.
 
-# Create DNS records
-bc.create_record webserver example.com 192.168.1.100
-bc.create_record mail example.com 192.168.1.101
-bc.create_cname www example.com webserver.example.com
+```bash
+# Load the Chief plugin (BC_HOST unset = local mode on the DNS host)
+source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
+
+# Create DNS records (only A, CNAME, TXT supported for writes)
+bc.create webserver.example.com 192.168.1.100
+bc.create mail.example.com      192.168.1.101
+bc.create CNAME www.example.com webserver
 
 # List and manage records
-bc.list_records example.com
-bc.delete_record webserver example.com
+bc.list example.com
+bc.update webserver.example.com 192.168.1.200
+bc.delete webserver.example.com
 
-# Refresh DNS
-./tools/bindcaptain_manager.sh refresh
+# Validate + reload BIND
+bc.refresh
 ```
 
 ## Supported Distributions
@@ -158,11 +161,12 @@ sudo ./bindcaptain.sh run       # Start container
 sudo ./bindcaptain.sh stop      # Stop container
 sudo ./bindcaptain.sh status    # Check status
 
-# DNS management
-source ./tools/bindcaptain_manager.sh
-bc.create_record --help       # Show help
-bc.list_records               # List records
-./tools/bindcaptain_manager.sh refresh   # Reload BIND configuration
+# DNS management — Chief plugin (recommended)
+source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
+bc.help                       # Show all bc.* commands
+bc.create --help              # Per-command help
+bc.list                       # List records (all zones)
+bc.refresh                    # Validate zones and reload BIND
 
 # System management
 sudo ./tools/system-setup.sh    # One-time system setup

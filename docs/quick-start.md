@@ -73,17 +73,20 @@ nslookup example.com localhost
 
 ## Step 6: Manage DNS Records
 
-Load the management functions:
+Load the Chief plugin (works locally on the DNS host with `BC_HOST` unset, and remotely from a workstation when `BC_HOST` is set):
 
 ```bash
-source ./tools/bindcaptain_manager.sh
+source ./chief-plugin/bc_chief-plugin.sh
+# or, when installed: source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
 ```
 
 Create your first DNS record:
 
 ```bash
-bc.create_record webserver example.com 192.168.1.100
+bc.create webserver.example.com 192.168.1.100
 ```
+
+> See [DNS Operations](dns-operations.md) for the full command reference, including the in-container manager primitives (`bc.create_record`, etc.) for direct host-local use.
 
 ## Next Steps
 
@@ -100,11 +103,11 @@ sudo ./bindcaptain.sh run      # Start service
 sudo ./bindcaptain.sh stop     # Stop service
 sudo ./bindcaptain.sh status   # Check status
 
-# DNS management
-source ./tools/bindcaptain_manager.sh
-bc.create_record host domain.com 192.168.1.100
-bc.list_records domain.com
-bc.delete_record host domain.com
+# DNS management — Chief plugin (recommended; works local + remote)
+source ./chief-plugin/bc_chief-plugin.sh
+bc.create host.domain.com 192.168.1.100
+bc.list   domain.com
+bc.delete host.domain.com
 ```
 
 ## Troubleshooting

@@ -106,11 +106,13 @@ sudo ./tools/config-setup.sh wizard
 sudo ./bindcaptain.sh build
 sudo ./bindcaptain.sh run
 
-# 4. Manage DNS records
-source ./tools/bindcaptain_manager.sh
-bc.create_record webserver example.com 192.168.1.100
+# 4. Manage DNS records (Chief plugin — same API local + remote)
+source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
+bc.create webserver.example.com 192.168.1.100
 
 # 5. Refresh/maintenance
+bc.refresh
+# As a script (cron / systemd timers):
 ./tools/bindcaptain_manager.sh refresh
 ```
 
@@ -122,11 +124,14 @@ sudo ./tools/system-setup.sh
 # Configuration setup only
 sudo ./tools/config-setup.sh wizard
 
-# DNS management only
-source ./tools/bindcaptain_manager.sh
-bc.create_record --help
+# DNS management only (Chief plugin — recommended)
+source /opt/bindcaptain/chief-plugin/bc_chief-plugin.sh
+bc.help
+bc.create --help
 
 # Refresh/maintenance only
+bc.refresh
+# As a script:
 ./tools/bindcaptain_manager.sh refresh
 ```
 
