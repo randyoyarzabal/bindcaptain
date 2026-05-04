@@ -76,7 +76,7 @@ BC_MANAGER="${BC_MANAGER:-/opt/bindcaptain/tools/bindcaptain_manager.sh}"
 
 # Plugin version. Should track the BindCaptain repo's VERSION file; surfaced
 # in bc.help and the load banner.
-BC_PLUGIN_VERSION="v1.2.0"
+BC_PLUGIN_VERSION="v1.2.1"
 
 # Run a shell command on the BindCaptain host (SSH when BC_HOST is set, else this machine).
 _bc_ssh() {

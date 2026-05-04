@@ -2,7 +2,7 @@
 
 > **Containerized BIND DNS Server — Deploy in Minutes**
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue)](VERSION) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![BIND](https://img.shields.io/badge/BIND-9.16%2B-orange)](https://www.isc.org/bind/)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue)](VERSION) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![BIND](https://img.shields.io/badge/BIND-9.16%2B-orange)](https://www.isc.org/bind/)
 
 **Repository:** <https://github.com/randyoyarzabal/bindcaptain>
 

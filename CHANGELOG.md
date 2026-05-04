@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-05-03
+
+### Fixed
+- `bc.*` wildcard owner support across every command. Previously,
+  `validate_relative_dns_name` rejected `*` and `_` labels outright, so
+  `bc.delete *.apps.example.com` failed at the gate, and creating
+  underscore-name TXT records (e.g. `_dmarc`, `_acme-challenge`) was
+  blocked.
+  - Validator now accepts a leftmost-only `*` (RFC 4592) and labels
+    starting with `_` (RFC 8552); rejects illegal forms like `host*`,
+    `*.*`, empty labels.
+  - `bc.create_record` / `bc.create_cname` existence checks and
+    in-place delete via `grep`/`sed` now escape `*` and `.` as
+    literals (new `__regex_escape_owner` helper); a wildcard owner
+    no longer accidentally matches sibling records.
+  - PTR sync skips wildcard A records — reverse PTRs are not defined
+    for wildcard owners.
+- `bc.list` JSON: SOA-minimum TTL fallback so RRs with no explicit
+  TTL and no `$TTL` directive surface a non-null TTL; CR characters
+  in zone files are stripped before parsing.
+
 ## [1.2.0] - 2026-05-02
 
 ### Added
@@ -79,6 +100,7 @@ Initial public release. Containerized BIND 9.16+ DNS server with:
 - Configuration wizard (`tools/config-setup.sh`)
 - Containerfile, named.conf templates, example zones
 
-[Unreleased]: https://github.com/randyoyarzabal/bindcaptain/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/randyoyarzabal/bindcaptain/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/randyoyarzabal/bindcaptain/releases/tag/v1.2.1
 [1.2.0]: https://github.com/randyoyarzabal/bindcaptain/releases/tag/v1.2.0
 [1.0.0]: https://github.com/randyoyarzabal/bindcaptain/releases/tag/v1.0.0
