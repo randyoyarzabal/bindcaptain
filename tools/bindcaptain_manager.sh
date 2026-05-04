@@ -150,6 +150,16 @@ __dns_normalize() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/\.*$//'
 }
 
+# Escape a relative DNS owner name for use as a literal in BRE/ERE patterns.
+# Handles dots and the wildcard label "*" (RFC 4592), plus "_" pass-through.
+__regex_escape_owner() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//./\\.}"
+    s="${s//\*/\\*}"
+    printf '%s' "$s"
+}
+
 # Build zone file without matching RRs; list removed lines in match_ref file.
 # Args: zone_file apex_domain target_fqdn (normalized or not) rrtype_filter keep_varname match_varname (namerefs).
 # Returns 1 if no RR matched (temp files removed).
@@ -626,6 +636,10 @@ __emit_forward_a_map() {
             if [ "$type" != "A" ]; then
                 continue
             fi
+            # Wildcard A records (RFC 4592) must not produce reverse PTRs.
+            if [[ "$name" == "*" || "$name" == "*."* ]]; then
+                continue
+            fi
             value="${value%%;*}"
             value=$(echo "$value" | sed 's/[[:space:]]*$//')
             [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue
@@ -834,10 +848,13 @@ bc.create_record() {
         zone_file="$BIND_DIR/${domain}.db"
     fi
     
-    # Match RR owner: first field equals hostname (zone-relative label chain)
-    if grep -qE "^${hostname//./\\.}[[:space:]]" "$zone_file"; then
+    # Match RR owner: first field equals hostname (zone-relative label chain).
+    # Escape regex metachars including wildcard "*" (RFC 4592 owner labels).
+    local _hn_esc
+    _hn_esc=$(__regex_escape_owner "$hostname")
+    if grep -qE "^${_hn_esc}[[:space:]]" "$zone_file"; then
         print_status "warning" "Record $hostname already exists in $domain"
-        
+
         # In non-interactive mode, fail rather than overwrite
         if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
             print_status "error" "Record already exists (use delete first, or run interactively to overwrite)"
@@ -850,8 +867,6 @@ bc.create_record() {
                 return 0
             fi
         fi
-        # Remove existing record (escape . for sed)
-        local _hn_esc="${hostname//./\\.}"
         sed -i "/^${_hn_esc}[[:space:]]/d" "$zone_file"
     fi
     
@@ -991,9 +1006,12 @@ bc.create_cname() {
         zone_file="$BIND_DIR/${domain}.db"
     fi
     
-    if grep -qE "^${alias//./\\.}[[:space:]]" "$zone_file"; then
+    # Escape regex metachars including wildcard "*" for safe lookup/removal.
+    local _al_esc
+    _al_esc=$(__regex_escape_owner "$alias")
+    if grep -qE "^${_al_esc}[[:space:]]" "$zone_file"; then
         print_status "warning" "Record $alias already exists in $domain"
-        
+
         # In non-interactive mode, fail rather than overwrite
         if [ "${BIND_NONINTERACTIVE:-0}" = "1" ]; then
             print_status "error" "Record already exists (use delete first, or run interactively to overwrite)"
@@ -1006,8 +1024,6 @@ bc.create_cname() {
                 return 0
             fi
         fi
-        # Remove existing record
-        local _al_esc="${alias//./\\.}"
         sed -i "/^${_al_esc}[[:space:]]/d" "$zone_file"
     fi
     

@@ -184,7 +184,9 @@ validate_hostname() {
     return 0
 }
 
-# Validate a relative owner name (one or more DNS labels), e.g. mactest or mactest.lab or @
+# Validate a relative owner name (one or more DNS labels).
+# Accepts: mactest, mactest.lab, @, leading wildcard "*" (RFC 4592, leftmost only),
+# and labels starting with "_" (RFC 8552, e.g. _dmarc, _acme-challenge).
 validate_relative_dns_name() {
     local n="$1"
     [[ "$n" == "@" ]] && return 0
@@ -192,9 +194,16 @@ validate_relative_dns_name() {
     local IFS='.'
     local -a parts
     read -ra parts <<< "$n"
-    local p
-    for p in "${parts[@]}"; do
-        [[ "$p" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$ ]] || return 1
+    local i p
+    for i in "${!parts[@]}"; do
+        p="${parts[$i]}"
+        # Wildcard label: only valid as the leftmost label, and only by itself.
+        if [[ "$p" == "*" ]]; then
+            [[ "$i" -eq 0 ]] || return 1
+            continue
+        fi
+        # Standard label, optionally beginning with "_" for service/underscore names.
+        [[ "$p" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9_\-]{0,61}[a-zA-Z0-9])?$ ]] || return 1
     done
     return 0
 }
