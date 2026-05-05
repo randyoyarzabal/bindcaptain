@@ -928,11 +928,14 @@ Options:
   clean="$(_bc_strip_ansi <<<"$raw")"
 
   if [[ "$exit_code" -ne 0 ]]; then
-    local err_line
-    err_line="$(grep -E '^(error|fatal):' <<<"$clean" | tail -1)"
-    echo -e "${RED}✗ git_refresh failed${NC}  Host: ${host_label}"
-    echo "  Message: ${err_line:-git pull exited ${exit_code}}"
-    echo "  (run with --verbose for full output)"
+    # On failure, dump the full git pull output to stderr so the user sees
+    # the real error (merge conflict, auth failure, network, etc.).
+    if [[ -n "$raw" ]]; then
+      echo "----- git pull output -----" >&2
+      echo "$raw" >&2
+      echo "---------------------------" >&2
+    fi
+    echo -e "${RED}✗ git_refresh failed (exit ${exit_code})${NC}  Host: ${host_label}"
     return $exit_code
   fi
 
@@ -1011,6 +1014,15 @@ Options:
   svc_state="$(_bc_ssh "sudo systemctl is-active bindcaptain" 2>&1)"
   svc_rc=$?
 
+  # is-active prints "active"/"inactive"/"failed" on success or rc==3, but on
+  # transport / sudo / unknown-unit failures it emits an error message and a
+  # different rc. Surface that raw output so the user can act on it.
+  if [[ $svc_rc -ne 0 && $svc_rc -ne 3 ]]; then
+    [[ -n "$svc_state" ]] && { echo "$svc_state" >&2; }
+    echo -e "${RED}✗ bc.status: failed to query service (exit ${svc_rc})${NC}  Host: ${host_label}" >&2
+    return $svc_rc
+  fi
+
   local container
   container="$(_bc_ssh "sudo podman ps --filter name=bindcaptain --format '{{.Names}} {{.Status}}'" 2>&1)"
 
@@ -1029,9 +1041,7 @@ Options:
   fi
   echo "  (run with --verbose for full systemctl + podman output)"
 
-  # is-active exits 0 on active, 3 on inactive — both are valid query results.
-  [[ $svc_rc -eq 0 || $svc_rc -eq 3 ]] && return 0
-  return $svc_rc
+  return 0
 }
 
 # Internal: run `systemctl <action> bindcaptain` and emit a one-line summary,
@@ -1066,13 +1076,15 @@ _bc_service_action() {
   if [[ "$exit_code" -eq 0 ]]; then
     echo -e "${GREEN}✓ Service ${action}ed${NC}  Host: ${host_label}"
   else
-    local clean
-    clean="$(_bc_strip_ansi <<<"$raw")"
-    local err_line
-    err_line="$(tail -1 <<<"$clean")"
-    echo -e "${RED}✗ Service ${action} failed${NC}  Host: ${host_label}"
-    echo "  Message: ${err_line:-systemctl exited ${exit_code}}"
-    echo "  (run with --verbose for full output)"
+    # On failure, surface the full underlying output so the user sees the real
+    # error (journalctl hint, dependency failure, etc.). Goes to stderr so
+    # callers parsing stdout for the summary aren't broken.
+    if [[ -n "$raw" ]]; then
+      echo "----- systemctl $action output -----" >&2
+      echo "$raw" >&2
+      echo "------------------------------------" >&2
+    fi
+    echo -e "${RED}✗ Service ${action} failed (exit ${exit_code})${NC}  Host: ${host_label}"
   fi
   return $exit_code
 }
