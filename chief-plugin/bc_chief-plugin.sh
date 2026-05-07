@@ -75,7 +75,7 @@ BC_HOST="${BC_HOST:-}"
 BC_MANAGER="${BC_MANAGER:-/opt/bindcaptain/tools/bindcaptain_manager.sh}"
 
 # Plugin version. Should track the BindCaptain repo's VERSION file; surfaced
-# in bc.help and the load banner.
+# in bc.help.
 BC_PLUGIN_VERSION="v1.2.2"
 
 # Run a shell command on the BindCaptain host (SSH when BC_HOST is set, else this machine).
@@ -1149,6 +1149,3 @@ alias bc.cname='bc.create_cname'
 alias bc.txt='bc.create_txt'
 alias bc.rm='bc.delete'
 alias bc.ls='bc.list'
-
-# Show quick help on load (stderr so stdout stays clean for bc.list --json | jq)
-echo "⚓BindCaptain ${BC_PLUGIN_VERSION} loaded. Type 'bc.help' for usage." >&2
